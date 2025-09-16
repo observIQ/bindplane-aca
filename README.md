@@ -20,7 +20,7 @@ go build -o bindplane-aca main.go
 
 ## Architecture
 
-BindPlane on Azure Container Apps consists of multiple microservices working together to provide a comprehensive observability platform. For detailed information about the architecture, component relationships, and system design, see the [Architecture Documentation](docs/architecture.md).
+Bindplane on Azure Container Apps consists of multiple microservices working together to provide a comprehensive observability platform. For detailed information about the architecture, component relationships, and system design, see the [Architecture Documentation](docs/architecture.md).
 
 ## Prerequisites Setup
 

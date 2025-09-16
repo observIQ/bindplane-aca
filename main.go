@@ -75,7 +75,7 @@ func parseFlags() *Config {
 	flag.StringVar(&config.PostgresHost, "postgres-host", "", "PostgreSQL hostname (required)")
 	flag.StringVar(&config.PostgresUsername, "postgres-username", "", "PostgreSQL username (required)")
 	flag.StringVar(&config.PostgresDatabase, "postgres-database", "", "PostgreSQL database name (required)")
-	flag.StringVar(&config.License, "license", "", "BindPlane license key (required)")
+	flag.StringVar(&config.License, "license", "", "Bindplane license key (required)")
 	flag.StringVar(&config.PostgresPassword, "postgres-password", "", "PostgreSQL password (required)")
 	flag.StringVar(&config.StorageAccountName, "storage-account-name", "", "Azure Storage Account name (required)")
 	flag.StringVar(&config.StorageAccountKey, "storage-account-key", "", "Azure Storage Account key (required)")
@@ -177,11 +177,11 @@ func generateDeploymentCommands(config *Config) {
 
 	commands := []string{
 		"#!/bin/bash",
-		"# Generated deployment commands for BindPlane Azure Container Apps",
+		"# Generated deployment commands for Bindplane Azure Container Apps",
 		"",
 		"set -e",
 		"",
-		"echo \"Deploying BindPlane to Azure Container Apps...\"",
+		"echo \"Deploying Bindplane to Azure Container Apps...\"",
 		"",
 		"# Deploy in order to ensure proper dependencies",
 		"",
@@ -203,7 +203,7 @@ func generateDeploymentCommands(config *Config) {
 		"echo \"6. Deploying Jobs component...\"",
 		fmt.Sprintf("az containerapp apply -f %s/jobs.yaml --resource-group %s", config.OutputDir, config.ResourceGroup),
 		"",
-		"echo \"7. Deploying main BindPlane application...\"",
+		"echo \"7. Deploying main Bindplane application...\"",
 		fmt.Sprintf("az containerapp apply -f %s/bindplane.yaml --resource-group %s", config.OutputDir, config.ResourceGroup),
 		"",
 		"echo \"Deployment complete!\"",

@@ -1,4 +1,4 @@
-# Main BindPlane Container App
+# Main Bindplane Container App
 apiVersion: apps/v1
 kind: ContainerApp
 metadata:
