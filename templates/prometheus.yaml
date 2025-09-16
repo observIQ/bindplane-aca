@@ -1,10 +1,7 @@
-apiVersion: apps/v1
-kind: ContainerApp
-metadata:
-  name: bindplane-prometheus
-  namespace: default
-spec:
-  environmentId: {{.ACAEnvironmentID}}
+name: bindplane-prometheus
+type: Microsoft.App/containerApps
+properties:
+  managedEnvironmentId: {{.ACAEnvironmentID}}
   configuration:
     activeRevisionsMode: Single
     ingress:
@@ -13,28 +10,20 @@ spec:
   template:
     initContainers:
       - name: config-init
-        image: prom/prometheus:v3.4.0
+        image: prom/prometheus:v2.53.0
         command:
           - /bin/sh
           - -c
+        args:
           - |
-            # Create config directory
             mkdir -p /shared-config/etc/prometheus
-            
-            # Write prometheus.yml
             cat > /shared-config/etc/prometheus/prometheus.yml << 'EOF'
             scrape_configs: []
             rule_files: [/etc/prometheus/rules.yml]
             EOF
-            
-            # Write web.yml
             cat > /shared-config/etc/prometheus/web.yml << 'EOF'
-            # This file should be empty unless configured
-            # by the user. See the Prometheus auth and TLS
-            # docs here: https://prometheus.io/docs/prometheus/latest/configuration/https/
+            # Empty by default. Configure if needed.
             EOF
-            
-            # Write rules.yml
             cat > /shared-config/etc/prometheus/rules.yml << 'EOF'
             groups:
             - name: configuration-rollups
@@ -53,15 +42,16 @@ spec:
               - record: bindplane_agent_measurements:rollup:rate:1h
                 expr: sum without (agent) (rate(bindplane_agent_measurements:15m{}[1h14m59s999ms] offset 10s))
             EOF
-            
             echo "Configuration files written successfully"
         volumeMounts:
-          - name: config-volume
+          - volumeName: config-volume
             mountPath: /shared-config
     containers:
       - name: prometheus
-        image: prom/prometheus:v3.4.0
+        image: prom/prometheus:v2.53.0
         command:
+          - /bin/prometheus
+        args:
           - --config.file=/etc/prometheus/prometheus.yml
           - --web.config.file=/etc/prometheus/web.yml
           - --storage.tsdb.retention.time=2d
@@ -71,12 +61,12 @@ spec:
           - --web.console.templates=/etc/prometheus/consoles
           - --web.console.libraries=/etc/prometheus/console_libraries
         resources:
-          cpu: 250m
-          memory: 500Mi
+          cpu: 2.0
+          memory: 8Gi
         volumeMounts:
-          - name: prometheus-data
+          - volumeName: prometheus-data
             mountPath: /prometheus
-          - name: config-volume
+          - volumeName: config-volume
             mountPath: /etc/prometheus
     volumes:
       - name: prometheus-data

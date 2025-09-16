@@ -32,6 +32,50 @@ Before using this tool, ensure you have:
 4. **Azure Storage Account** - For persistent volume storage (see [Azure Storage Account Setup Guide](docs/azure-storage-setup.md))
 5. **Azure CLI** - Installed and authenticated for deployment
 
+
+### Create and attach Azure File storage volumes (Prometheus, NATS)
+
+Container Apps volumes that use Azure Files must be backed by file shares in your Storage Account and attached to the Container Apps environment as "environment storage" before apps can mount them.
+
+1) Create the Azure File shares (names below must match the templates):
+
+```bash
+STORAGE_ACCOUNT="<your storage account>"
+STORAGE_KEY="<your storage key>"
+
+# Create file shares
+az storage share create --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY" --name prometheus-data
+az storage share create --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY" --name prometheus-config
+```
+
+2) Attach those shares to the Container Apps environment as environment storage:
+
+```bash
+# Prometheus TSDB data
+az containerapp env storage set \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --storage-name prometheus-pv \
+  --azure-file-account-name "$STORAGE_ACCOUNT" \
+  --azure-file-account-key "$STORAGE_KEY" \
+  --azure-file-share-name prometheus-data \
+  --access-mode ReadWrite
+
+# Prometheus config
+az containerapp env storage set \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --storage-name prometheus-config-pv \
+  --azure-file-account-name "$STORAGE_ACCOUNT" \
+  --azure-file-account-key "$STORAGE_KEY" \
+  --azure-file-share-name prometheus-config \
+  --access-mode ReadWrite
+```
+
+Note: NATS uses an `emptyDir` volume in Azure Container Apps and does not require persistent storage.
+
+Once attached, the generated YAML in `templates/` references the above environment storage names via `template.volumes[].storageName` and mounts them via `volumeMounts[].volumeName`.
+
 ## Usage
 
 The tool requires several configuration parameters to generate the deployment files:
@@ -118,22 +162,22 @@ Deploy the components in order:
 cd out/
 
 # 1. Deploy secrets and storage
-az containerapp apply -f secrets.yaml --resource-group your-resource-group
+az containerapp create --name bindplane-secrets --resource-group your-resource-group --environment your-environment-id --yaml secrets.yaml
 
 # 2. Deploy Prometheus
-az containerapp apply -f prometheus.yaml --resource-group your-resource-group
+az containerapp create --name bindplane-prometheus --resource-group your-resource-group --environment your-environment-id --yaml prometheus.yaml
 
 # 3. Deploy Transform Agent
-az containerapp apply -f transform-agent.yaml --resource-group your-resource-group
+az containerapp create --name bindplane-transform-agent --resource-group your-resource-group --environment your-environment-id --yaml transform-agent.yaml
 
 # 4. Deploy NATS cluster
-az containerapp apply -f nats.yaml --resource-group your-resource-group
+az containerapp create --name bindplane-nats --resource-group your-resource-group --environment your-environment-id --yaml nats.yaml
 
 # 5. Deploy Jobs component
-az containerapp apply -f jobs.yaml --resource-group your-resource-group
+az containerapp create --name bindplane-jobs --resource-group your-resource-group --environment your-environment-id --yaml jobs.yaml
 
 # 6. Deploy main Bindplane application
-az containerapp apply -f bindplane.yaml --resource-group your-resource-group
+az containerapp create --name bindplane --resource-group your-resource-group --environment your-environment-id --yaml bindplane.yaml
 ```
 
 # Community
