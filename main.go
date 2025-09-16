@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 )
 
 // TemplateData holds all the values to be injected into the templates
@@ -132,9 +133,14 @@ func processTemplates(config *Config, data *TemplateData) error {
 		"secrets.yaml",
 	}
 
-	for _, filename := range templateFiles {
+	for i, filename := range templateFiles {
 		if err := processTemplate(config, data, filename); err != nil {
 			return fmt.Errorf("failed to process template %s: %w", filename, err)
+		}
+
+		// Add delay between template generations (except after the last one)
+		if i < len(templateFiles)-1 {
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
@@ -144,6 +150,8 @@ func processTemplates(config *Config, data *TemplateData) error {
 func processTemplate(config *Config, data *TemplateData, filename string) error {
 	templatePath := filepath.Join(config.TemplatesDir, filename)
 	outputPath := filepath.Join(config.OutputDir, filename)
+
+	fmt.Printf("Processing template: %s -> %s\n", templatePath, outputPath)
 
 	// Read template file
 	templateContent, err := os.ReadFile(templatePath)
@@ -168,6 +176,8 @@ func processTemplate(config *Config, data *TemplateData, filename string) error 
 	if err := tmpl.Execute(outputFile, data); err != nil {
 		return fmt.Errorf("failed to execute template %s: %w", filename, err)
 	}
+
+	fmt.Printf("Generated: %s\n", outputPath)
 
 	return nil
 }

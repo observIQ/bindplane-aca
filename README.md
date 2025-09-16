@@ -29,7 +29,7 @@ Before using this tool, ensure you have:
 1. **Bindplane Enterprise License** - Valid license key
 2. **Azure Container Apps Environment** - Already created and accessible
 3. **Azure Database for PostgreSQL** - Deployed and configured (see [Bindplane's PostgreSQL setup documentation](https://docs.bindplane.com/deployment/virtual-machine/postgresql))
-4. **Azure Storage Account** - For persistent volume storage
+4. **Azure Storage Account** - For persistent volume storage (see [Azure Storage Account Setup Guide](docs/azure-storage-setup.md))
 5. **Azure CLI** - Installed and authenticated for deployment
 
 ## Usage
