@@ -27,10 +27,64 @@ Bindplane on Azure Container Apps consists of multiple microservices working tog
 Before using this tool, ensure you have:
 
 1. **Bindplane Enterprise License** - Valid license key
-2. **Azure Container Apps Environment** - Already created and accessible
+2. **Azure Container Apps Environment** - Already created and accessible (see [Creating a VNet-injected Container Apps Environment](#creating-a-vnet-injected-container-apps-environment))
 3. **Azure Database for PostgreSQL** - Deployed and configured (see [Bindplane's PostgreSQL setup documentation](https://docs.bindplane.com/deployment/virtual-machine/postgresql))
 4. **Azure Storage Account** - For persistent volume storage (see [Azure Storage Account Setup Guide](docs/azure-storage-setup.md))
 5. **Azure CLI** - Installed and authenticated for deployment
+
+### Creating a VNet-injected Container Apps Environment
+
+This deployment requires a VNet-injected Container Apps environment to support private endpoints for Azure Files. Create your environment with the following commands:
+
+```bash
+# Set your variables
+RESOURCE_GROUP="your-resource-group"
+LOCATION="eastus"
+ENV_NAME="your-aca-environment"
+VNET_NAME="bindplane-vnet"
+SUBNET_NAME="container-apps-subnet"
+VNET_CIDR="10.0.0.0/16"
+SUBNET_CIDR="10.0.1.0/24"
+
+# Create resource group (if it doesn't exist)
+az group create \
+  --name "$RESOURCE_GROUP" \
+  --location "$LOCATION"
+
+# Create VNet
+az network vnet create \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$VNET_NAME" \
+  --location "$LOCATION" \
+  --address-prefix "$VNET_CIDR"
+
+# Create subnet for Container Apps
+az network vnet subnet create \
+  --resource-group "$RESOURCE_GROUP" \
+  --vnet-name "$VNET_NAME" \
+  --name "$SUBNET_NAME" \
+  --address-prefix "$SUBNET_CIDR"
+
+# Create Container Apps environment with VNet integration
+az containerapp env create \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --location "$LOCATION" \
+  --infrastructure-subnet-resource-id "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$SUBNET_NAME" \
+  --internal-only false
+
+# Verify the environment was created with VNet integration
+az containerapp env show \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.infrastructureSubnetId"
+```
+
+**Important Notes:**
+- The `--infrastructure-subnet-resource-id` parameter enables VNet integration
+- The `--internal-only false` parameter allows both internal and external traffic
+- The subnet must have at least `/24` CIDR (256 IPs) for Container Apps
+- After creation, you can use the VNet details in the [Azure Storage Account Setup Guide](docs/azure-storage-setup.md) for private endpoint configuration
 
 
 ### Required Images
@@ -80,7 +134,7 @@ Once attached, the generated YAML in `templates/` references the above environme
 
 ### Network security for Azure Files (required)
 
-Azure Container Apps must be able to reach your Storage Account's Azure Files endpoint over SMB (TCP 445). Choose one approach:
+Azure Container Apps must be able to reach your Storage Account's Azure Files endpoint over SMB (TCP 445). This deployment requires a private endpoint for secure connectivity.
 
 1) Verify the share and environment storage
 
@@ -97,68 +151,16 @@ az containerapp env storage list \
   --resource-group "$RESOURCE_GROUP" -o table
 ```
 
-2A) Public networking (simpler; production caution)
+2) Private endpoint configuration (required)
 
-```bash
-# Ensure public access is enabled on the storage account
-az storage account update \
-  --name "$STORAGE_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --public-network-access Enabled
+For detailed step-by-step instructions on setting up the private endpoint, see the [Azure Storage Account Setup Guide](docs/azure-storage-setup.md). The guide includes:
 
-# If using selected networks, allow ACA outbound IPs
-OUT_IPS=$(az containerapp env show \
-  --name "$ENV_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query "properties.outboundIpAddresses" -o tsv)
+- Automatic VNet discovery from your Container Apps environment
+- Creating a dedicated subnet for private endpoints
+- Setting up private DNS resolution
+- Disabling public network access for security
 
-for ip in $OUT_IPS; do
-  az storage account network-rule add \
-    --resource-group "$RESOURCE_GROUP" \
-    --account-name "$STORAGE_ACCOUNT" \
-    --ip-address "$ip"
-done
-```
-
-2B) Private endpoint (recommended for production)
-
-```bash
-# Create a private endpoint for the File service and link Private DNS
-VNET_RG="<vnet resource group>"
-VNET_NAME="<vnet name>"
-SUBNET_NAME="<subnet for private endpoints>"
-PE_NAME="${STORAGE_ACCOUNT}-file-pe"
-PE_RG="$RESOURCE_GROUP"
-
-STG_ID=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query id -o tsv)
-az network private-endpoint create \
-  --name "$PE_NAME" \
-  --resource-group "$PE_RG" \
-  --vnet-name "$VNET_NAME" \
-  --subnet "$SUBNET_NAME" \
-  --private-connection-resource-id "$STG_ID" \
-  --group-ids file \
-  --connection-name "${STORAGE_ACCOUNT}-file-conn"
-
-az network private-dns zone create -g "$PE_RG" -n privatelink.file.core.windows.net || true
-az network private-dns link vnet create \
-  -g "$PE_RG" -n "${VNET_NAME}-file-link" \
-  -z privatelink.file.core.windows.net \
-  -v "$VNET_NAME" --registration-enabled false || true
-
-NIC_ID=$(az network private-endpoint show -g "$PE_RG" -n "$PE_NAME" --query "networkInterfaces[0].id" -o tsv)
-PE_IP=$(az network nic show --ids "$NIC_ID" --query "ipConfigurations[0].privateIpAddress" -o tsv)
-az network private-dns record-set a create -g "$PE_RG" -z privatelink.file.core.windows.net -n "$STORAGE_ACCOUNT" || true
-az network private-dns record-set a add-record -g "$PE_RG" -z privatelink.file.core.windows.net -n "$STORAGE_ACCOUNT" -a "$PE_IP" || true
-
-# Optional: Disable public network access on the storage account after PE is configured
-az storage account update \
-  --name "$STORAGE_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --public-network-access Disabled
-```
-
-Note: If your organization blocks outbound TCP 445, you must use the private endpoint approach.
+**Note:** This deployment requires a VNet-injected Container Apps environment. If you haven't created one yet, see the [Creating a VNet-injected Container Apps Environment](#creating-a-vnet-injected-container-apps-environment) section above.
 
 ## Usage
 
