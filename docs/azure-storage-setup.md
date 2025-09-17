@@ -201,14 +201,28 @@ az network private-dns link vnet create \
   --registration-enabled false
 
 # Get the private endpoint IP and create DNS record
+# First, verify the private endpoint was created successfully
+echo "Verifying private endpoint creation..."
+az network private-endpoint show \
+  -g "$PE_RG" \
+  -n "$PE_NAME" \
+  --query "provisioningState" -o tsv
+
+# Get the network interface ID (the query path may vary)
 NIC_ID=$(az network private-endpoint show \
   -g "$PE_RG" \
   -n "$PE_NAME" \
   --query "networkInterfaces[0].id" -o tsv)
 
+# Extract NIC name and resource group from the NIC ID
+NIC_RG=$(echo "$NIC_ID" | cut -d'/' -f5)
+NIC_NAME=$(echo "$NIC_ID" | cut -d'/' -f9)
+
+# Get the private IP address using resource group and name (more reliable than --ids)
 PE_IP=$(az network nic show \
-  --ids "$NIC_ID" \
-  --query "ipConfigurations[0].privateIpAddress" -o tsv)
+  --resource-group "$NIC_RG" \
+  --name "$NIC_NAME" \
+  --query "ipConfigurations[0].privateIPAddress" -o tsv)
 
 # Create DNS A record
 az network private-dns record-set a create \
@@ -237,45 +251,6 @@ az storage account update \
 ```
 
 This private endpoint approach ensures secure connectivity and is required for production deployments.
-
-## Storage Performance Considerations
-
-For optimal Prometheus performance, create your storage account with these specifications:
-
-1. **Performance tier**: **Standard** (required for Azure File shares)
-2. **Redundancy**: **ZRS (Zone Redundant Storage)** - Recommended for production workloads to ensure high availability
-3. **Access tier**: **Hot** - Prometheus requires frequent read/write access for time-series data
-
-The deployment will provision approximately **120Gi** for Prometheus time-series data (2-day retention). NATS uses `EmptyDir` and does not require Azure Files.
-
-Update your storage account creation command to use ZRS for better availability:
-
-```bash
-az storage account create \
-  --name $STORAGE_ACCOUNT \
-  --resource-group $RESOURCE_GROUP \
-  --location $LOCATION \
-  --sku Standard_ZRS \
-  --kind StorageV2 \
-  --access-tier Hot \
-  --https-only true \
-  --min-tls-version TLS1_2
-```
-
-## Troubleshooting Common Issues
-
-### Storage Account Name Already Exists
-Storage account names must be globally unique across all of Azure. If you get this error, try a different name.
-
-### Insufficient Permissions
-Ensure your account has the following permissions:
-- `Storage Account Contributor` role
-- `Storage Blob Data Contributor` role (if using blob storage)
-
-### Access Key Not Working
-- Verify you're using the correct key
-- Check if the storage account has firewall rules that might be blocking access
-- Ensure the key hasn't been regenerated
 
 ## Additional Resources
 
