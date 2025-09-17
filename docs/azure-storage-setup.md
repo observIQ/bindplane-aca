@@ -104,73 +104,135 @@ az containerapp env storage list --name "$ENV_NAME" --resource-group "$RESOURCE_
 
 ## Network security for Azure Files
 
-Azure Container Apps must be able to reach Azure Files over SMB (TCP 445). Choose one:
+Azure Container Apps must be able to reach Azure Files over SMB (TCP 445). This deployment requires a private endpoint for secure connectivity.
 
-### Option A: Public networking (quick start)
+### Private endpoint configuration
+
+This deployment requires a VNet-injected Container Apps environment. First, determine your Container Apps environment's VNet details, then create a private endpoint for the File service.
+
+#### Step 1: Get your Container Apps environment VNet information
 
 ```bash
-# Ensure the storage account allows public access
-az storage account update \
-  --name "$STORAGE_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --public-network-access Enabled
+# Get the VNet details from your existing Container Apps environment
+ENV_NAME="<your ACA environment name>"
+RESOURCE_GROUP="<your resource group>"
 
-# If using selected networks, permit ACA outbound IPs
-OUT_IPS=$(az containerapp env show \
+# Get VNet information from the Container Apps environment
+VNET_ID=$(az containerapp env show \
   --name "$ENV_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --query "properties.outboundIpAddresses" -o tsv)
+  --query "properties.infrastructureSubnetId" \
+  --output tsv)
 
-for ip in $OUT_IPS; do
-  az storage account network-rule add \
-    --resource-group "$RESOURCE_GROUP" \
-    --account-name "$STORAGE_ACCOUNT" \
-    --ip-address "$ip"
-done
+# Extract VNet resource group and name from the subnet ID
+VNET_RG=$(echo "$VNET_ID" | cut -d'/' -f5)
+VNET_NAME=$(echo "$VNET_ID" | cut -d'/' -f9)
+SUBNET_NAME=$(echo "$VNET_ID" | cut -d'/' -f11)
+
+echo "VNet Resource Group: $VNET_RG"
+echo "VNet Name: $VNET_NAME" 
+echo "Subnet Name: $SUBNET_NAME"
 ```
 
-Note: Outbound IPs can change when the environment scales or updates.
-
-### Option B: Private endpoint (recommended)
-
-Use a VNet-injected ACA environment. Create a private endpoint for the File service and configure Private DNS:
+#### Step 2: Create a dedicated subnet for private endpoints
 
 ```bash
-VNET_RG="<vnet resource group>"
-VNET_NAME="<vnet name>"
-SUBNET_NAME="<subnet for private endpoints>"
+# Create a new subnet specifically for private endpoints (if it doesn't exist)
+PE_SUBNET_NAME="private-endpoints"
+PE_SUBNET_CIDR="10.0.2.0/24"  # Adjust based on your VNet CIDR
+
+# Check if subnet already exists
+if ! az network vnet subnet show \
+  --resource-group "$VNET_RG" \
+  --vnet-name "$VNET_NAME" \
+  --name "$PE_SUBNET_NAME" &>/dev/null; then
+  
+  echo "Creating private endpoint subnet..."
+  az network vnet subnet create \
+    --resource-group "$VNET_RG" \
+    --vnet-name "$VNET_NAME" \
+    --name "$PE_SUBNET_NAME" \
+    --address-prefix "$PE_SUBNET_CIDR" \
+    --disable-private-endpoint-network-policies false
+else
+  echo "Private endpoint subnet already exists"
+fi
+```
+
+#### Step 3: Create the private endpoint for Azure Files
+
+```bash
+# Set variables for private endpoint creation
 PE_NAME="${STORAGE_ACCOUNT}-file-pe"
 PE_RG="$RESOURCE_GROUP"
 
+# Get storage account resource ID
 STG_ID=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query id -o tsv)
+
+# Create the private endpoint
 az network private-endpoint create \
   --name "$PE_NAME" \
   --resource-group "$PE_RG" \
   --vnet-name "$VNET_NAME" \
-  --subnet "$SUBNET_NAME" \
+  --subnet "$PE_SUBNET_NAME" \
   --private-connection-resource-id "$STG_ID" \
   --group-ids file \
   --connection-name "${STORAGE_ACCOUNT}-file-conn"
+```
 
-az network private-dns zone create -g "$PE_RG" -n privatelink.file.core.windows.net || true
+#### Step 4: Configure Private DNS
+
+```bash
+# Create private DNS zone for Azure Files
+az network private-dns zone create \
+  -g "$PE_RG" \
+  -n privatelink.file.core.windows.net || true
+
+# Link the DNS zone to your VNet
 az network private-dns link vnet create \
-  -g "$PE_RG" -n "${VNET_NAME}-file-link" \
+  -g "$PE_RG" \
+  -n "${VNET_NAME}-file-link" \
   -z privatelink.file.core.windows.net \
-  -v "$VNET_NAME" --registration-enabled false || true
+  -v "$VNET_NAME" \
+  --registration-enabled false || true
 
-NIC_ID=$(az network private-endpoint show -g "$PE_RG" -n "$PE_NAME" --query "networkInterfaces[0].id" -o tsv)
-PE_IP=$(az network nic show --ids "$NIC_ID" --query "ipConfigurations[0].privateIpAddress" -o tsv)
-az network private-dns record-set a create -g "$PE_RG" -z privatelink.file.core.windows.net -n "$STORAGE_ACCOUNT" || true
-az network private-dns record-set a add-record -g "$PE_RG" -z privatelink.file.core.windows.net -n "$STORAGE_ACCOUNT" -a "$PE_IP" || true
+# Get the private endpoint IP and create DNS record
+NIC_ID=$(az network private-endpoint show \
+  -g "$PE_RG" \
+  -n "$PE_NAME" \
+  --query "networkInterfaces[0].id" -o tsv)
 
-# (Optional) Disable public network access afterwards
+PE_IP=$(az network nic show \
+  --ids "$NIC_ID" \
+  --query "ipConfigurations[0].privateIpAddress" -o tsv)
+
+# Create DNS A record
+az network private-dns record-set a create \
+  -g "$PE_RG" \
+  -z privatelink.file.core.windows.net \
+  -n "$STORAGE_ACCOUNT" || true
+
+az network private-dns record-set a add-record \
+  -g "$PE_RG" \
+  -z privatelink.file.core.windows.net \
+  -n "$STORAGE_ACCOUNT" \
+  -a "$PE_IP" || true
+
+echo "Private endpoint IP: $PE_IP"
+echo "DNS record created for: $STORAGE_ACCOUNT.privatelink.file.core.windows.net"
+```
+
+#### Step 5: Disable public network access
+
+```bash
+# Disable public network access for security
 az storage account update \
   --name "$STORAGE_ACCOUNT" \
   --resource-group "$RESOURCE_GROUP" \
   --public-network-access Disabled
 ```
 
-If your organization blocks outbound TCP 445, you must use this private endpoint approach.
+This private endpoint approach ensures secure connectivity and is required for production deployments.
 
 ## Storage Performance Considerations
 
