@@ -154,32 +154,6 @@ After running the tool, you'll find generated files in the `out/` directory:
 - `secrets.yaml` - Kubernetes secrets and persistent volumes
 - `deploy.sh` - Automated deployment script
 
-### Manual Deployment
-
-Deploy the components in order:
-
-```bash
-cd out/
-
-# 1. Deploy secrets and storage
-az containerapp create --name bindplane-secrets --resource-group your-resource-group --environment your-environment-id --yaml secrets.yaml
-
-# 2. Deploy Prometheus
-az containerapp create --name bindplane-prometheus --resource-group your-resource-group --environment your-environment-id --yaml prometheus.yaml
-
-# 3. Deploy Transform Agent
-az containerapp create --name bindplane-transform-agent --resource-group your-resource-group --environment your-environment-id --yaml transform-agent.yaml
-
-# 4. Deploy NATS cluster
-az containerapp create --name bindplane-nats --resource-group your-resource-group --environment your-environment-id --yaml nats.yaml
-
-# 5. Deploy Jobs component
-az containerapp create --name bindplane-jobs --resource-group your-resource-group --environment your-environment-id --yaml jobs.yaml
-
-# 6. Deploy main Bindplane application
-az containerapp create --name bindplane --resource-group your-resource-group --environment your-environment-id --yaml bindplane.yaml
-```
-
 # Community
 
 The Bindplane Azure Container Apps deployment tool is an open source project. If you'd like to contribute, take a look at our [contribution guidelines](/docs/CONTRIBUTING.md) and [developer guide](/docs/development.md). We look forward to building with you.
