@@ -1,5 +1,6 @@
 name: bindplane-jobs
 type: Microsoft.App/containerApps
+location: eastus
 properties:
   managedEnvironmentId: {{.ACAEnvironmentID}}
   configuration:
@@ -11,9 +12,9 @@ properties:
   template:
     containers:
       - name: server
-        image: ghcr.io/observiq/bindplane-ee:1.94.0
+        image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
         resources:
-          cpu: 1.0
+          cpu: 2
           memory: 4Gi
         env:
           - name: BINDPLANE_MODE
@@ -39,7 +40,7 @@ properties:
           - name: BINDPLANE_PASSWORD
             value: bppass
           - name: BINDPLANE_SESSION_SECRET
-            value: 4484766F-5016-4077-B8E0-0DE1D637854B
+            value: {{.SessionSecret}}
           - name: BINDPLANE_LOGGING_OUTPUT
             value: stdout
           - name: BINDPLANE_CONFIG_HOME
@@ -68,10 +69,8 @@ properties:
             value: "20"
           - name: BINDPLANE_EVENT_BUS_TYPE
             value: nats
-          - name: BINDPLANE_NATS_CLIENT_NAME
-            value: bindplane-jobs
           - name: BINDPLANE_NATS_CLIENT_ENDPOINT
-            value: nats://bindplane-nats:4222
+            value: nats://bindplane-nats-0:4222,nats://bindplane-nats-1:4222,nats://bindplane-nats-2:4222
           - name: BINDPLANE_NATS_CLIENT_SUBJECT
             value: bindplane-event-bus
           - name: BINDPLANE_PORT

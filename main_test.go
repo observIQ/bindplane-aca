@@ -31,7 +31,6 @@ func TestTemplateProcessing(t *testing.T) {
 		"nats.yaml",
 		"prometheus.yaml",
 		"transform-agent.yaml",
-		"secrets.yaml",
 	}
 
 	for _, filename := range templateFiles {

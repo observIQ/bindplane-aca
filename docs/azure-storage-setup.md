@@ -71,6 +71,107 @@ az storage account keys list \
 
 This will output just the key value that you can use directly with the `-storage-account-key` parameter. The tool will automatically handle base64 encoding when generating the deployment templates.
 
+## Verify Azure File share and attach environment storage
+
+1) Create the Azure File share used by Prometheus (name must match templates):
+
+```bash
+STORAGE_ACCOUNT="<your storage account>"
+STORAGE_KEY="<your storage key>"
+
+az storage share create --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY" --name prometheus-data
+```
+
+2) Attach that share to the Container Apps environment as environment storage (name must be `prometheus-pv`):
+
+```bash
+ENV_NAME="<your ACA environment name>"
+RESOURCE_GROUP="<your resource group>"
+
+az containerapp env storage set \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --storage-name prometheus-pv \
+  --azure-file-account-name "$STORAGE_ACCOUNT" \
+  --azure-file-account-key "$STORAGE_KEY" \
+  --azure-file-share-name prometheus-data \
+  --access-mode ReadWrite
+
+# Verify
+az storage share show --name prometheus-data --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY" -o table
+az containerapp env storage list --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP" -o table
+```
+
+## Network security for Azure Files
+
+Azure Container Apps must be able to reach Azure Files over SMB (TCP 445). Choose one:
+
+### Option A: Public networking (quick start)
+
+```bash
+# Ensure the storage account allows public access
+az storage account update \
+  --name "$STORAGE_ACCOUNT" \
+  --resource-group "$RESOURCE_GROUP" \
+  --public-network-access Enabled
+
+# If using selected networks, permit ACA outbound IPs
+OUT_IPS=$(az containerapp env show \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.outboundIpAddresses" -o tsv)
+
+for ip in $OUT_IPS; do
+  az storage account network-rule add \
+    --resource-group "$RESOURCE_GROUP" \
+    --account-name "$STORAGE_ACCOUNT" \
+    --ip-address "$ip"
+done
+```
+
+Note: Outbound IPs can change when the environment scales or updates.
+
+### Option B: Private endpoint (recommended)
+
+Use a VNet-injected ACA environment. Create a private endpoint for the File service and configure Private DNS:
+
+```bash
+VNET_RG="<vnet resource group>"
+VNET_NAME="<vnet name>"
+SUBNET_NAME="<subnet for private endpoints>"
+PE_NAME="${STORAGE_ACCOUNT}-file-pe"
+PE_RG="$RESOURCE_GROUP"
+
+STG_ID=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query id -o tsv)
+az network private-endpoint create \
+  --name "$PE_NAME" \
+  --resource-group "$PE_RG" \
+  --vnet-name "$VNET_NAME" \
+  --subnet "$SUBNET_NAME" \
+  --private-connection-resource-id "$STG_ID" \
+  --group-ids file \
+  --connection-name "${STORAGE_ACCOUNT}-file-conn"
+
+az network private-dns zone create -g "$PE_RG" -n privatelink.file.core.windows.net || true
+az network private-dns link vnet create \
+  -g "$PE_RG" -n "${VNET_NAME}-file-link" \
+  -z privatelink.file.core.windows.net \
+  -v "$VNET_NAME" --registration-enabled false || true
+
+NIC_ID=$(az network private-endpoint show -g "$PE_RG" -n "$PE_NAME" --query "networkInterfaces[0].id" -o tsv)
+PE_IP=$(az network nic show --ids "$NIC_ID" --query "ipConfigurations[0].privateIpAddress" -o tsv)
+az network private-dns record-set a create -g "$PE_RG" -z privatelink.file.core.windows.net -n "$STORAGE_ACCOUNT" || true
+az network private-dns record-set a add-record -g "$PE_RG" -z privatelink.file.core.windows.net -n "$STORAGE_ACCOUNT" -a "$PE_IP" || true
+
+# (Optional) Disable public network access afterwards
+az storage account update \
+  --name "$STORAGE_ACCOUNT" \
+  --resource-group "$RESOURCE_GROUP" \
+  --public-network-access Disabled
+```
+
+If your organization blocks outbound TCP 445, you must use this private endpoint approach.
+
 ## Storage Performance Considerations
 
 For optimal Prometheus performance, create your storage account with these specifications:
@@ -79,9 +180,7 @@ For optimal Prometheus performance, create your storage account with these speci
 2. **Redundancy**: **ZRS (Zone Redundant Storage)** - Recommended for production workloads to ensure high availability
 3. **Access tier**: **Hot** - Prometheus requires frequent read/write access for time-series data
 
-The deployment will provision approximately **125Gi total storage**:
-- **120Gi** for Prometheus time-series data (2-day retention)
-- **5Gi** for NATS message persistence
+The deployment will provision approximately **120Gi** for Prometheus time-series data (2-day retention). NATS uses `EmptyDir` and does not require Azure Files.
 
 Update your storage account creation command to use ZRS for better availability:
 

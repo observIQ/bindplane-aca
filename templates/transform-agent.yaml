@@ -1,5 +1,6 @@
 name: bindplane-transform-agent
 type: Microsoft.App/containerApps
+location: eastus
 properties:
   managedEnvironmentId: {{.ACAEnvironmentID}}
   configuration:
@@ -11,7 +12,7 @@ properties:
   template:
     containers:
       - name: transform-agent
-        image: ghcr.io/observiq/bindplane-transform-agent:1.94.0-bindplane
+        image: ghcr.io/observiq/bindplane-transform-agent:{{.BindplaneTag}}-bindplane
         resources:
           cpu: 1.0
           memory: 2Gi

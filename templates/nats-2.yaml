@@ -1,0 +1,130 @@
+name: bindplane-nats-2
+type: Microsoft.App/containerApps
+location: eastus
+properties:
+  managedEnvironmentId: {{.ACAEnvironmentID}}
+  configuration:
+    activeRevisionsMode: single
+    ingress:
+      external: false
+      targetPort: 8222
+      allowInsecure: true
+      additionalPortMappings:
+        - targetPort: 6222
+          external: false
+        - targetPort: 4222
+          external: false
+  template:
+    containers:
+      - name: server
+        image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+        env:
+          - name: BINDPLANE_MODE
+            value: node
+          - name: BINDPLANE_LOGGING_OUTPUT
+            value: stdout
+          - name: BINDPLANE_LOGGING_LEVEL
+            value: debug
+          - name: BINDPLANE_ANALYTICS_DISABLED
+            value: "false"
+          - name: BINDPLANE_TRANSFORM_AGENT_ENABLE_REMOTE
+            value: "true"
+          - name: BINDPLANE_TRANSFORM_AGENT_REMOTE_AGENTS
+            value: "bindplane-transform-agent:4568"
+          - name: BINDPLANE_LICENSE
+            value: {{.License}}
+          - name: BINDPLANE_ACCEPT_EULA
+            value: "true"
+          - name: BINDPLANE_AGENT_VERSIONS_CLIENTS
+            value: "github"
+          - name: BINDPLANE_REMOTE_URL
+            value: http://bindplane.local:80
+          - name: BINDPLANE_USERNAME
+            value: bpuser
+          - name: BINDPLANE_PASSWORD
+            value: bppass
+          - name: BINDPLANE_SESSION_SECRET
+            value: {{.SessionSecret}}
+          - name: BINDPLANE_PROMETHEUS_ENABLE
+            value: "true"
+          - name: BINDPLANE_PROMETHEUS_ENABLE_REMOTE
+            value: "true"
+          - name: BINDPLANE_PROMETHEUS_HOST
+            value: bindplane-prometheus
+          - name: BINDPLANE_PROMETHEUS_PORT
+            value: "9090"
+          - name: BINDPLANE_PROMETHEUS_REMOTE_WRITE_ENDPOINT
+            value: /api/v1/write
+          - name: BINDPLANE_PROMETHEUS_AUTH_TYPE
+            value: none
+          - name: BINDPLANE_METRICS_TYPE
+            value: prometheus
+          - name: BINDPLANE_METRICS_PROMETHEUS_ENDPOINT
+            value: /metrics
+
+          # Bindplane's bbolt store is used to remove
+          # its reliance on PostgreSQL. The NATS server
+          # component does not read and and write to the
+          # storage. It is unnecessary to use shared storage.
+          - name: BINDPLANE_CONFIG_HOME
+            value: /data
+          - name: BINDPLANE_STORE_TYPE
+            value: bbolt
+          
+          - name: BINDPLANE_EVENT_BUS_TYPE
+            value: nats
+          - name: BINDPLANE_NATS_SERVER_ENABLE
+            value: "true"
+          - name: BINDPLANE_NATS_SERVER_CLIENT_HOST
+            value: "0.0.0.0"
+          - name: BINDPLANE_NATS_SERVER_CLIENT_PORT
+            value: "4222"
+          - name: BINDPLANE_NATS_SERVER_HTTP_HOST
+            value: "0.0.0.0"
+          - name: BINDPLANE_NATS_SERVER_HTTP_PORT
+            value: "8222"
+          - name: BINDPLANE_NATS_SERVER_CLUSTER_NAME
+            value: bindplane
+          - name: BINDPLANE_NATS_SERVER_CLUSTER_HOST
+            value: "0.0.0.0"
+          - name: BINDPLANE_NATS_SERVER_CLUSTER_PORT
+            value: "6222"
+          - name: BINDPLANE_NATS_SERVER_CLUSTER_ROUTES
+            value: nats://bindplane-nats-0:6222,nats://bindplane-nats-1:6222
+          - name: BINDPLANE_NATS_CLIENT_ENDPOINT
+            value: nats://127.0.0.1:4222 
+          - name: BINDPLANE_NATS_CLIENT_SUBJECT
+            value: bindplane-event-bus
+          - name: BINDPLANE_PORT
+            value: "3001"
+        volumeMounts:
+          - volumeName: data
+            mountPath: /data
+        probes:
+          - type: liveness
+            httpGet:
+              path: /healthz?js-enabled-only=true
+              port: 8222
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: readiness
+            httpGet:
+              path: /healthz?js-server-only=true
+              port: 8222
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+    volumes:
+      - name: data
+        storageType: EmptyDir
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
+
+

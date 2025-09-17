@@ -1,80 +1,28 @@
 name: bindplane-prometheus
 type: Microsoft.App/containerApps
+location: eastus
 properties:
   managedEnvironmentId: {{.ACAEnvironmentID}}
   configuration:
     activeRevisionsMode: Single
     ingress:
       external: false
+      allowInsecure: true
       targetPort: 9090
   template:
-    initContainers:
-      - name: config-init
-        image: prom/prometheus:v2.53.0
-        command:
-          - /bin/sh
-          - -c
-        args:
-          - |
-            mkdir -p /shared-config/etc/prometheus
-            cat > /shared-config/etc/prometheus/prometheus.yml << 'EOF'
-            scrape_configs: []
-            rule_files: [/etc/prometheus/rules.yml]
-            EOF
-            cat > /shared-config/etc/prometheus/web.yml << 'EOF'
-            # Empty by default. Configure if needed.
-            EOF
-            cat > /shared-config/etc/prometheus/rules.yml << 'EOF'
-            groups:
-            - name: configuration-rollups
-              interval: 1m
-              rules:
-              - record: bindplane_agent_measurements:rollup:rate:1m
-                expr: sum without (agent) (rate(bindplane_agent_measurements{}[1m9s999ms] offset 10s))
-            - name: 5m-configuration-rollups
-              interval: 5m
-              rules:
-              - record: bindplane_agent_measurements:rollup:rate:5m
-                expr: sum without (agent) (rate(bindplane_agent_measurements:1m{}[5m59s999ms] offset 10s))
-            - name: 1h-configuration-rollups
-              interval: 1h
-              rules:
-              - record: bindplane_agent_measurements:rollup:rate:1h
-                expr: sum without (agent) (rate(bindplane_agent_measurements:15m{}[1h14m59s999ms] offset 10s))
-            EOF
-            echo "Configuration files written successfully"
-        volumeMounts:
-          - volumeName: config-volume
-            mountPath: /shared-config
     containers:
       - name: prometheus
-        image: prom/prometheus:v2.53.0
-        command:
-          - /bin/prometheus
-        args:
-          - --config.file=/etc/prometheus/prometheus.yml
-          - --web.config.file=/etc/prometheus/web.yml
-          - --storage.tsdb.retention.time=2d
-          - --web.enable-remote-write-receiver
-          - --web.listen-address=:9090
-          - --storage.tsdb.path=/prometheus
-          - --web.console.templates=/etc/prometheus/consoles
-          - --web.console.libraries=/etc/prometheus/console_libraries
+        image: ghcr.io/observiq/bindplane-prometheus:{{.BindplaneTag}}
         resources:
           cpu: 2.0
-          memory: 8Gi
+          memory: 4Gi
         volumeMounts:
           - volumeName: prometheus-data
             mountPath: /prometheus
-          - volumeName: config-volume
-            mountPath: /etc/prometheus
     volumes:
       - name: prometheus-data
         storageType: AzureFile
         storageName: prometheus-pv
-      - name: config-volume
-        storageType: AzureFile
-        storageName: prometheus-config-pv
     scale:
       minReplicas: 1
       maxReplicas: 1

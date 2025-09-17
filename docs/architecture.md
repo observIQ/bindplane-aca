@@ -131,7 +131,7 @@ capabilities.
 - **Container Image**: `ghcr.io/observiq/bindplane-ee`
 - **Replicas**: 3 (clustered for high availability)
 - **Ingress**: Internal only
-- **Dependencies**: Azure File Storage (for Bindplane scratch storage)
+- **Dependencies**: None for persistence (uses `EmptyDir` for Bindplane scratch storage)
 - **Ports**:
   - 4222: Client connections
   - 6222: Cluster mesh communication
@@ -153,14 +153,14 @@ capabilities.
 - Uses NATS clustering for high availability
 - Cluster mesh topology for fault tolerance
 - Each Bindplane server instance runs an embedded NATS server that participates in the cluster
-- Azure File Storage is used for Bindplane scratch storage
+- Uses `EmptyDir` volume for Bindplane scratch storage; no Azure Files required
 
 ### 6. Prometheus
 
 **Purpose**: Internal metrics storage for Bindplane collector throughput and health metrics. This is not intended for consumption by external monitoring tools like Grafana and does not store Bindplane's operational metrics.
 
 **Architecture Details**:
-- **Container Image**: `prom/prometheus`
+- **Container Image**: `ghcr.io/observiq/bindplane-prometheus:<BindplaneTag>`
 - **Replicas**: 1 (single instance with persistent storage)
 - **Ingress**: Internal only
 - **Dependencies**: Azure File Storage (for metrics persistence)
@@ -197,7 +197,6 @@ capabilities.
 
 **Storage Allocations**:
 - **Prometheus**: 120GB Azure File Storage for metrics data retention
-- **NATS**: 5GB Azure File Storage for Bindplane scratch storage (not used for NATS storage or JetStream)
 
 **Configuration**:
 - Uses Azure File Storage shares mounted as persistent volumes
@@ -240,21 +239,6 @@ Each component is configured with appropriate resource requests and limits:
 - CPU and memory limits prevent resource contention
 - Health checks ensure automatic restart of failed containers
 - Readiness probes ensure traffic only routes to healthy instances
-
-## Security Architecture
-
-### Network Security
-
-- **Internal Communication**: All inter-service communication happens within the Container Apps Environment
-- **External Access**: Only Bindplane main application has external ingress
-- **Database Security**: PostgreSQL connections use SSL encryption
-- **Secret Management**: Sensitive data stored in Azure Container Apps secrets
-
-### Container Security
-
-- **Non-root Users**: All containers run as non-root users
-- **Read-only Filesystems**: Containers use read-only root filesystems where possible
-- **Minimal Images**: Based on minimal container images for reduced attack surface
 
 ## High Availability
 

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"time"
 )
 
 // TemplateData holds all the values to be injected into the templates
@@ -24,6 +23,8 @@ type TemplateData struct {
 	Base64StorageAccountName string
 	Base64StorageAccountKey  string
 	ResourceGroup            string
+	BindplaneTag             string
+	SessionSecret            string
 }
 
 // Config holds command line arguments
@@ -39,6 +40,8 @@ type Config struct {
 	ResourceGroup      string
 	OutputDir          string
 	TemplatesDir       string
+	BindplaneTag       string
+	SessionSecret      string
 }
 
 func main() {
@@ -61,6 +64,8 @@ func main() {
 		Base64StorageAccountName: base64.StdEncoding.EncodeToString([]byte(config.StorageAccountName)),
 		Base64StorageAccountKey:  base64.StdEncoding.EncodeToString([]byte(config.StorageAccountKey)),
 		ResourceGroup:            config.ResourceGroup,
+		BindplaneTag:             config.BindplaneTag,
+		SessionSecret:            config.SessionSecret,
 	}
 
 	if err := processTemplates(config, templateData); err != nil {
@@ -87,6 +92,8 @@ func parseFlags() *Config {
 	flag.StringVar(&config.ResourceGroup, "resource-group", "", "Azure Resource Group name (required)")
 	flag.StringVar(&config.OutputDir, "output-dir", "out", "Output directory for generated files")
 	flag.StringVar(&config.TemplatesDir, "templates-dir", "templates", "Templates directory")
+	flag.StringVar(&config.BindplaneTag, "bindplane-tag", "1.94.3", "Bindplane image tag (default 1.94.3)")
+	flag.StringVar(&config.SessionSecret, "session-secret", "", "Bindplane session secret (required)")
 
 	flag.Parse()
 
@@ -104,6 +111,7 @@ func validateConfig(config *Config) error {
 		"storage-account-name": config.StorageAccountName,
 		"storage-account-key":  config.StorageAccountKey,
 		"resource-group":       config.ResourceGroup,
+		"session-secret":       config.SessionSecret,
 	}
 
 	var missing []string
@@ -131,19 +139,16 @@ func processTemplates(config *Config, data *TemplateData) error {
 		"bindplane.yaml",
 		"jobs.yaml",
 		"jobs-migrate.yaml",
-		"nats.yaml",
+		"nats-0.yaml",
+		"nats-1.yaml",
+		"nats-2.yaml",
 		"prometheus.yaml",
 		"transform-agent.yaml",
 	}
 
-	for i, filename := range templateFiles {
+	for _, filename := range templateFiles {
 		if err := processTemplate(config, data, filename); err != nil {
 			return fmt.Errorf("failed to process template %s: %w", filename, err)
-		}
-
-		// Add delay between template generations (except after the last one)
-		if i < len(templateFiles)-1 {
-			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
@@ -153,8 +158,6 @@ func processTemplates(config *Config, data *TemplateData) error {
 func processTemplate(config *Config, data *TemplateData, filename string) error {
 	templatePath := filepath.Join(config.TemplatesDir, filename)
 	outputPath := filepath.Join(config.OutputDir, filename)
-
-	fmt.Printf("Processing template: %s -> %s\n", templatePath, outputPath)
 
 	// Read template file
 	templateContent, err := os.ReadFile(templatePath)
@@ -199,43 +202,29 @@ func generateDeploymentCommands(config *Config) {
 		"# Ensure environment storage exists for Azure Files volumes",
 		fmt.Sprintf("ENV_NAME=$(basename %s)", config.ACAEnvironmentID),
 		fmt.Sprintf("echo \"Using Container Apps environment: $ENV_NAME in resource group %s\"", config.ResourceGroup),
-		fmt.Sprintf("az containerapp env storage set --name $ENV_NAME --resource-group %s --storage-name prometheus-pv --azure-file-account-name %s --azure-file-account-key %s --azure-file-share-name prometheus-data --access-mode ReadWrite || true", config.ResourceGroup, config.StorageAccountName, config.StorageAccountKey),
-		fmt.Sprintf("az containerapp env storage set --name $ENV_NAME --resource-group %s --storage-name prometheus-config-pv --azure-file-account-name %s --azure-file-account-key %s --azure-file-share-name prometheus-config --access-mode ReadWrite || true", config.ResourceGroup, config.StorageAccountName, config.StorageAccountKey),
-		"",
-		"# Helper to wait until a Container App is ready",
-		"wait_for_app() {",
-		"  local name=\"$1\"",
-		fmt.Sprintf("  echo \"Waiting for %s/$name to become ready...\"", config.ResourceGroup),
-		fmt.Sprintf("  for i in {1..60}; do ready=$(az containerapp show --name \"$name\" --resource-group %s --query \"properties.latestReadyRevisionName!=null && properties.latestReadyRevisionName==properties.latestRevisionName\" -o tsv 2>/dev/null || echo false); if [ \"$ready\" = \"true\" ]; then echo \"$name is ready.\"; return 0; fi; sleep 5; done", config.ResourceGroup),
-		"  echo \"Timed out waiting for $name to become ready\"",
-		"  return 1",
-		"}",
+		fmt.Sprintf("az containerapp env storage set --name \"$ENV_NAME\" --resource-group %s --storage-name prometheus-pv --azure-file-account-name \"%s\" --azure-file-account-key \"%s\" --azure-file-share-name prometheus-data --access-mode ReadWrite || true", config.ResourceGroup, config.StorageAccountName, config.StorageAccountKey),
 		"",
 		"# Deploy in order to ensure proper dependencies",
 		"",
-		"echo \"1. Deploying NATS cluster...\"",
-		fmt.Sprintf("az containerapp create --name bindplane-nats --resource-group %s --yaml %s/nats.yaml", config.ResourceGroup, config.OutputDir),
-		"wait_for_app bindplane-nats",
+		"echo \"1. Deploying NATS cluster apps...\"",
+		fmt.Sprintf("az containerapp create --name bindplane-nats-0 --resource-group %s --yaml %s/nats-0.yaml", config.ResourceGroup, config.OutputDir),
+		fmt.Sprintf("az containerapp create --name bindplane-nats-1 --resource-group %s --yaml %s/nats-1.yaml", config.ResourceGroup, config.OutputDir),
+		fmt.Sprintf("az containerapp create --name bindplane-nats-2 --resource-group %s --yaml %s/nats-2.yaml", config.ResourceGroup, config.OutputDir),
 		"",
 		"echo \"2. Deploying Prometheus...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-prometheus --resource-group %s --yaml %s/prometheus.yaml", config.ResourceGroup, config.OutputDir),
-		"wait_for_app bindplane-prometheus",
 		"",
 		"echo \"3. Deploying Transform Agent...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-transform-agent --resource-group %s --yaml %s/transform-agent.yaml", config.ResourceGroup, config.OutputDir),
-		"wait_for_app bindplane-transform-agent",
 		"",
 		"echo \"4. Deploying Jobs Migrate component...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-jobs-migrate --resource-group %s --yaml %s/jobs-migrate.yaml", config.ResourceGroup, config.OutputDir),
-		"wait_for_app bindplane-jobs-migrate",
 		"",
 		"echo \"5. Deploying Jobs component...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-jobs --resource-group %s --yaml %s/jobs.yaml", config.ResourceGroup, config.OutputDir),
-		"wait_for_app bindplane-jobs",
 		"",
 		"echo \"6. Deploying main Bindplane application...\"",
 		fmt.Sprintf("az containerapp create --name bindplane --resource-group %s --yaml %s/bindplane.yaml", config.ResourceGroup, config.OutputDir),
-		"wait_for_app bindplane",
 		"",
 		"echo \"Deployment complete!\"",
 		"",
