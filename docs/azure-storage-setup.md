@@ -190,7 +190,7 @@ az network private-endpoint create \
 # Create private DNS zone for Azure Files
 az network private-dns zone create \
   -g "$PE_RG" \
-  -n privatelink.file.core.windows.net || true
+  -n privatelink.file.core.windows.net
 
 # Link the DNS zone to your VNet
 az network private-dns link vnet create \
@@ -198,7 +198,7 @@ az network private-dns link vnet create \
   -n "${VNET_NAME}-file-link" \
   -z privatelink.file.core.windows.net \
   -v "$VNET_NAME" \
-  --registration-enabled false || true
+  --registration-enabled false
 
 # Get the private endpoint IP and create DNS record
 NIC_ID=$(az network private-endpoint show \
@@ -214,13 +214,13 @@ PE_IP=$(az network nic show \
 az network private-dns record-set a create \
   -g "$PE_RG" \
   -z privatelink.file.core.windows.net \
-  -n "$STORAGE_ACCOUNT" || true
+  -n "$STORAGE_ACCOUNT"
 
 az network private-dns record-set a add-record \
   -g "$PE_RG" \
   -z privatelink.file.core.windows.net \
   -n "$STORAGE_ACCOUNT" \
-  -a "$PE_IP" || true
+  -a "$PE_IP"
 
 echo "Private endpoint IP: $PE_IP"
 echo "DNS record created for: $STORAGE_ACCOUNT.privatelink.file.core.windows.net"
