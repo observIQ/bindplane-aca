@@ -54,7 +54,7 @@ properties:
           - name: BINDPLANE_POSTGRES_USERNAME
             value: {{.PostgresUsername}}
           - name: BINDPLANE_POSTGRES_PASSWORD
-            value: {{.PostgresPassword}}
+            value: "{{.PostgresPassword}}"
           - name: BINDPLANE_POSTGRES_DATABASE
             value: {{.PostgresDatabase}}
           - name: BINDPLANE_POSTGRES_SSL_MODE
