@@ -165,16 +165,20 @@ fi
 # Set variables for private endpoint creation
 PE_NAME="${STORAGE_ACCOUNT}-file-pe"
 PE_RG="$RESOURCE_GROUP"
+LOCATION="eastus"  # Set your Azure region
 
 # Get storage account resource ID
 STG_ID=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query id -o tsv)
 
 # Create the private endpoint
+# When VNet and private endpoint are in different resource groups, use the full subnet resource ID
+SUBNET_RESOURCE_ID="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$VNET_RG/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$PE_SUBNET_NAME"
+
 az network private-endpoint create \
   --name "$PE_NAME" \
+  --location "$LOCATION" \
   --resource-group "$PE_RG" \
-  --vnet-name "$VNET_NAME" \
-  --subnet "$PE_SUBNET_NAME" \
+  --subnet "$SUBNET_RESOURCE_ID" \
   --private-connection-resource-id "$STG_ID" \
   --group-ids file \
   --connection-name "${STORAGE_ACCOUNT}-file-conn"
