@@ -174,7 +174,7 @@ The tool requires several configuration parameters to generate the deployment fi
   -postgres-database "bindplane" \
   -license "your-bindplane-license-key" \
   -postgres-password "your-postgres-password" \
-  -storage-account-name "yourstorageaccount" \
+  -storage-account-name "$STORAGE_ACCOUNT" \
   -storage-account-key "your-storage-key" \
   -resource-group "your-resource-group" \
   -session-secret "<random-uuid-or-strong-secret>" \

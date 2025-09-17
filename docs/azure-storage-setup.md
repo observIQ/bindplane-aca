@@ -38,11 +38,11 @@ Before creating an Azure Storage Account, ensure you have:
    ```bash
    # Replace these variables with your actual values
    RESOURCE_GROUP="your-resource-group"
-   STORAGE_ACCOUNT_NAME="yourstorageaccount"  # Must be globally unique, 3-24 characters, lowercase letters and numbers only
+   STORAGE_ACCOUNT="yourstorageaccount"  # Must be globally unique, 3-24 characters, lowercase letters and numbers only
    LOCATION="eastus"  # Choose your preferred Azure region
    
    az storage account create \
-     --name $STORAGE_ACCOUNT_NAME \
+     --name $STORAGE_ACCOUNT \
      --resource-group $RESOURCE_GROUP \
      --location $LOCATION \
      --sku Standard_ZRS \
@@ -54,7 +54,7 @@ Before creating an Azure Storage Account, ensure you have:
 
 4. **Verify the storage account was created**:
    ```bash
-   az storage account show --name $STORAGE_ACCOUNT_NAME --resource-group $RESOURCE_GROUP
+   az storage account show --name $STORAGE_ACCOUNT --resource-group $RESOURCE_GROUP
    ```
 
 ## Retrieving the Storage Account Access Key
@@ -64,7 +64,7 @@ The Bindplane ACA tool requires the storage account access key as a raw string v
 ```bash
 az storage account keys list \
   --resource-group $RESOURCE_GROUP \
-  --account-name $STORAGE_ACCOUNT_NAME \
+  --account-name $STORAGE_ACCOUNT \
   --query '[0].value' \
   --output tsv
 ```
@@ -248,7 +248,7 @@ Update your storage account creation command to use ZRS for better availability:
 
 ```bash
 az storage account create \
-  --name $STORAGE_ACCOUNT_NAME \
+  --name $STORAGE_ACCOUNT \
   --resource-group $RESOURCE_GROUP \
   --location $LOCATION \
   --sku Standard_ZRS \
