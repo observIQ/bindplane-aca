@@ -1,8 +1,8 @@
-name: bindplane-jobs
+name: bindplane-jobs-migrate
 type: Microsoft.App/containerApps
 location: eastus
 properties:
-  managedEnvironmentId: {{.ACAEnvironmentID}}
+  managedEnvironmentId: test-env-12345
   configuration:
     activeRevisionsMode: Single
     ingress:
@@ -12,13 +12,13 @@ properties:
   template:
     containers:
       - name: server
-        image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
+        image: ghcr.io/observiq/bindplane-ee:1.94.3
         resources:
           cpu: 2
           memory: 4Gi
         env:
           - name: BINDPLANE_MODE
-            value: all,-migrate
+            value: migrate
           - name: BINDPLANE_ANALYTICS_DISABLED
             value: "false"
           - name: BINDPLANE_TRANSFORM_AGENT_ENABLE_REMOTE
@@ -26,19 +26,19 @@ properties:
           - name: BINDPLANE_TRANSFORM_AGENT_REMOTE_AGENTS
             value: "bindplane-transform-agent:4568"
           - name: BINDPLANE_LICENSE
-            value: {{.License}}
+            value: test-license-key
           - name: BINDPLANE_ACCEPT_EULA
             value: "true"
           - name: BINDPLANE_AGENT_VERSIONS_CLIENTS
             value: "github"
           - name: BINDPLANE_REMOTE_URL
-            value: {{.BindplaneRemoteURL}}
+            value: http://localhost:3001
           - name: BINDPLANE_USERNAME
             value: bpuser
           - name: BINDPLANE_PASSWORD
             value: bppass
           - name: BINDPLANE_SESSION_SECRET
-            value: {{.SessionSecret}}
+            value: test-session-secret
           - name: BINDPLANE_LOGGING_OUTPUT
             value: stdout
           - name: BINDPLANE_CONFIG_HOME
@@ -46,15 +46,15 @@ properties:
           - name: BINDPLANE_STORE_TYPE
             value: postgres
           - name: BINDPLANE_POSTGRES_HOST
-            value: {{.PostgresHost}}
+            value: test-postgres.postgres.database.azure.com
           - name: BINDPLANE_POSTGRES_PORT
             value: "5432"
           - name: BINDPLANE_POSTGRES_USERNAME
-            value: {{.PostgresUsername}}
+            value: test_user
           - name: BINDPLANE_POSTGRES_PASSWORD
-            value: "{{.PostgresPassword}}"
+            value: "test-password"
           - name: BINDPLANE_POSTGRES_DATABASE
-            value: {{.PostgresDatabase}}
+            value: test_db
           - name: BINDPLANE_POSTGRES_SSL_MODE
             value: disable
           - name: BINDPLANE_POSTGRES_SSL_ROOT_CERT

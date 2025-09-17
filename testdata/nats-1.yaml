@@ -2,7 +2,7 @@ name: bindplane-nats-1
 type: Microsoft.App/containerApps
 location: eastus
 properties:
-  managedEnvironmentId: {{.ACAEnvironmentID}}
+  managedEnvironmentId: test-env-12345
   configuration:
     activeRevisionsMode: single
     ingress:
@@ -17,7 +17,7 @@ properties:
   template:
     containers:
       - name: server
-        image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
+        image: ghcr.io/observiq/bindplane-ee:1.94.3
         resources:
           cpu: 1.0
           memory: 2Gi
@@ -35,19 +35,19 @@ properties:
           - name: BINDPLANE_TRANSFORM_AGENT_REMOTE_AGENTS
             value: "bindplane-transform-agent:4568"
           - name: BINDPLANE_LICENSE
-            value: {{.License}}
+            value: test-license-key
           - name: BINDPLANE_ACCEPT_EULA
             value: "true"
           - name: BINDPLANE_AGENT_VERSIONS_CLIENTS
             value: "github"
           - name: BINDPLANE_REMOTE_URL
-            value: {{.BindplaneRemoteURL}}
+            value: http://localhost:3001
           - name: BINDPLANE_USERNAME
             value: bpuser
           - name: BINDPLANE_PASSWORD
             value: bppass
           - name: BINDPLANE_SESSION_SECRET
-            value: {{.SessionSecret}}
+            value: test-session-secret
           - name: BINDPLANE_PROMETHEUS_ENABLE
             value: "true"
           - name: BINDPLANE_PROMETHEUS_ENABLE_REMOTE

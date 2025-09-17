@@ -25,6 +25,7 @@ type TemplateData struct {
 	ResourceGroup            string
 	BindplaneTag             string
 	SessionSecret            string
+	BindplaneRemoteURL       string
 }
 
 // Config holds command line arguments
@@ -42,6 +43,7 @@ type Config struct {
 	TemplatesDir       string
 	BindplaneTag       string
 	SessionSecret      string
+	BindplaneRemoteURL string
 }
 
 func main() {
@@ -66,6 +68,7 @@ func main() {
 		ResourceGroup:            config.ResourceGroup,
 		BindplaneTag:             config.BindplaneTag,
 		SessionSecret:            config.SessionSecret,
+		BindplaneRemoteURL:       config.BindplaneRemoteURL,
 	}
 
 	if err := processTemplates(config, templateData); err != nil {
@@ -94,6 +97,7 @@ func parseFlags() *Config {
 	flag.StringVar(&config.TemplatesDir, "templates-dir", "templates", "Templates directory")
 	flag.StringVar(&config.BindplaneTag, "bindplane-tag", "1.94.3", "Bindplane image tag (default 1.94.3)")
 	flag.StringVar(&config.SessionSecret, "session-secret", "", "Bindplane session secret (required)")
+	flag.StringVar(&config.BindplaneRemoteURL, "bindplane-remote-url", "http://localhost:3001", "Bindplane remote URL (default http://localhost:3001)")
 
 	flag.Parse()
 

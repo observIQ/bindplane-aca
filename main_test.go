@@ -17,18 +17,25 @@ func TestTemplateProcessing(t *testing.T) {
 		PostgresHost:             "test-postgres.postgres.database.azure.com",
 		PostgresUsername:         "test_user",
 		PostgresDatabase:         "test_db",
+		License:                  "test-license-key",
+		PostgresPassword:         "test-password",
 		Base64License:            base64.StdEncoding.EncodeToString([]byte("test-license-key")),
 		Base64PostgresPassword:   base64.StdEncoding.EncodeToString([]byte("test-password")),
 		Base64StorageAccountName: base64.StdEncoding.EncodeToString([]byte("teststorageaccount")),
 		Base64StorageAccountKey:  base64.StdEncoding.EncodeToString([]byte("test-storage-key")),
 		ResourceGroup:            "test-rg",
+		BindplaneTag:             "1.94.3",
+		SessionSecret:            "test-session-secret",
+		BindplaneRemoteURL:       "http://localhost:3001",
 	}
 
 	templateFiles := []string{
 		"bindplane.yaml",
 		"jobs.yaml",
 		"jobs-migrate.yaml",
-		"nats.yaml",
+		"nats-0.yaml",
+		"nats-1.yaml",
+		"nats-2.yaml",
 		"prometheus.yaml",
 		"transform-agent.yaml",
 	}
@@ -96,6 +103,7 @@ func TestValidateConfig(t *testing.T) {
 				StorageAccountName: "test-storage",
 				StorageAccountKey:  "test-key",
 				ResourceGroup:      "test-rg",
+				SessionSecret:      "test-session-secret",
 			},
 			wantError: false,
 		},
@@ -190,6 +198,9 @@ func TestTemplateDataCreation(t *testing.T) {
 		StorageAccountName: "teststorageaccount",
 		StorageAccountKey:  "test-storage-key",
 		ResourceGroup:      "test-rg",
+		BindplaneTag:       "1.94.3",
+		SessionSecret:      "test-session-secret",
+		BindplaneRemoteURL: "http://localhost:3001",
 	}
 
 	data := &TemplateData{
@@ -202,6 +213,7 @@ func TestTemplateDataCreation(t *testing.T) {
 		Base64StorageAccountName: base64.StdEncoding.EncodeToString([]byte(config.StorageAccountName)),
 		Base64StorageAccountKey:  base64.StdEncoding.EncodeToString([]byte(config.StorageAccountKey)),
 		ResourceGroup:            config.ResourceGroup,
+		BindplaneRemoteURL:       "http://localhost:3001",
 	}
 
 	// Verify plain text fields

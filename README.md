@@ -210,7 +210,7 @@ The tool requires several configuration parameters to generate the deployment fi
 | `output-dir` | `out` | Directory where generated files will be written |
 | `templates-dir` | `templates` | Directory containing the template files |
 | `bindplane-tag` | `1.94.3` | Image tag for Bindplane components (also used to derive transform-agent and prometheus tags) |
-| `session-secret` |  | REQUIRED: Secret for Bindplane sessions |
+| `bindplane-remote-url` | `http://localhost:3001` | Remote URL for Bindplane components to communicate with the main application |
 
 
 ### Example Usage
@@ -250,6 +250,77 @@ After running the tool, you'll find generated files in the `out/` directory:
 - `prometheus.yaml` - Metrics collection and storage
 - `transform-agent.yaml` - Data transformation service
 - `deploy.sh` - Automated deployment script
+
+## Next Steps
+
+After successfully deploying Bindplane to Azure Container Apps, you'll need to enable external access to the main Bindplane application to make it accessible from the public internet.
+
+### Enable External Ingress
+
+By default, the main Bindplane application is configured with `external: false` for security. To enable public access:
+
+1. **Update the Bindplane Container App configuration** to enable external ingress:
+
+```bash
+# Enable external ingress for the main Bindplane app
+az containerapp ingress enable \
+  --name bindplane \
+  --resource-group "$RESOURCE_GROUP" \
+  --type external \
+  --target-port 3001 \
+  --transport http
+```
+
+2. **Get the HTTPS endpoint** provided by Azure Container Apps:
+
+```bash
+# Get the external URL for the Bindplane app
+az containerapp show \
+  --name bindplane \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.configuration.ingress.fqdn" \
+  --output tsv
+```
+
+This will return a URL similar to: `https://bindplane.jollysand-c93c8cbe.eastus.azurecontainerapps.io`
+
+3. **Update the remote URL configuration** by regenerating your deployment files with the new HTTPS endpoint:
+
+```bash
+# Regenerate deployment files with the public HTTPS endpoint
+./bindplane-aca \
+  -aca-environment-id "$ACA_ENV_ID" \
+  -postgres-host "$POSTGRES_HOST" \
+  -postgres-username "$POSTGRES_USER" \
+  -postgres-database "$POSTGRES_DB" \
+  -license "$BINDPLANE_LICENSE" \
+  -postgres-password "$POSTGRES_PASSWORD" \
+  -storage-account-name "$STORAGE_ACCOUNT" \
+  -storage-account-key "$STORAGE_KEY" \
+  -resource-group "$RESOURCE_GROUP" \
+  -session-secret "$SESSION_SECRET" \
+  -bindplane-remote-url "https://bindplane.jollysand-c93c8cbe.eastus.azurecontainerapps.io"
+```
+
+4. **Redeploy the updated configuration**:
+
+```bash
+# Update the Container Apps with the new configuration
+az containerapp update --name bindplane --resource-group "$RESOURCE_GROUP" --yaml out/bindplane.yaml
+az containerapp update --name bindplane-jobs --resource-group "$RESOURCE_GROUP" --yaml out/jobs.yaml
+az containerapp update --name bindplane-jobs-migrate --resource-group "$RESOURCE_GROUP" --yaml out/jobs-migrate.yaml
+az containerapp update --name bindplane-nats-0 --resource-group "$RESOURCE_GROUP" --yaml out/nats-0.yaml
+az containerapp update --name bindplane-nats-1 --resource-group "$RESOURCE_GROUP" --yaml out/nats-1.yaml
+az containerapp update --name bindplane-nats-2 --resource-group "$RESOURCE_GROUP" --yaml out/nats-2.yaml
+```
+
+### Access Bindplane
+
+Once the ingress is enabled and the configuration is updated, you can access Bindplane at the HTTPS endpoint provided by Azure Container Apps. The default credentials are:
+- **Username**: `bpuser`
+- **Password**: `bppass`
+
+**Security Note**: Change the default credentials immediately after first login for production deployments.
 
 # Community
 

@@ -1,42 +1,41 @@
-# Transform Agent Container App
-apiVersion: apps/v1
-kind: ContainerApp
-metadata:
-  name: bindplane-transform-agent
-  namespace: default
-spec:
-  environmentId: test-env-12345
+name: bindplane-transform-agent
+type: Microsoft.App/containerApps
+location: eastus
+properties:
+  managedEnvironmentId: test-env-12345
   configuration:
     activeRevisionsMode: Single
     ingress:
       external: false
       targetPort: 4568
+      allowInsecure: true
   template:
     containers:
       - name: transform-agent
-        image: ghcr.io/observiq/bindplane-transform-agent:1.94.0-bindplane
+        image: ghcr.io/observiq/bindplane-transform-agent:1.94.3-bindplane
         resources:
-          cpu: 2000m
-          memory: 8192Mi
+          cpu: 1.0
+          memory: 2Gi
         env:
           - name: PORT
             value: "4568"
-        livenessProbe:
-          httpGet:
-            path: /collector-version
-            port: 4568
-          initialDelaySeconds: 0
-          periodSeconds: 30
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /collector-version
-            port: 4568
-          initialDelaySeconds: 0
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+        probes:
+          - type: liveness
+            httpGet:
+              path: /collector-version
+              port: 4568
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: readiness
+            httpGet:
+              path: /collector-version
+              port: 4568
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
     scale:
-      minReplicas: 1
-      maxReplicas: 1
+      minReplicas: 2
+      maxReplicas: 2

@@ -40,7 +40,7 @@ properties:
           - name: BINDPLANE_AGENT_VERSIONS_CLIENTS
             value: "github"
           - name: BINDPLANE_REMOTE_URL
-            value: http://bindplane.local:80
+            value: {{.BindplaneRemoteURL}}
           - name: BINDPLANE_USERNAME
             value: bpuser
           - name: BINDPLANE_PASSWORD
