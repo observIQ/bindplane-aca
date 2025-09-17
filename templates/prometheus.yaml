@@ -1,0 +1,28 @@
+name: bindplane-prometheus
+type: Microsoft.App/containerApps
+location: eastus
+properties:
+  managedEnvironmentId: {{.ACAEnvironmentID}}
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      allowInsecure: true
+      targetPort: 9090
+  template:
+    containers:
+      - name: prometheus
+        image: ghcr.io/observiq/bindplane-prometheus:{{.BindplaneTag}}
+        resources:
+          cpu: 2.0
+          memory: 4Gi
+        volumeMounts:
+          - volumeName: prometheus-data
+            mountPath: /prometheus
+    volumes:
+      - name: prometheus-data
+        storageType: AzureFile
+        storageName: prometheus-pv
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
