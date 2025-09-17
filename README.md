@@ -65,6 +65,13 @@ az network vnet subnet create \
   --name "$SUBNET_NAME" \
   --address-prefix "$SUBNET_CIDR"
 
+# Delegate the subnet to Microsoft.App/environments (required for Container Apps)
+az network vnet subnet update \
+  --resource-group "$RESOURCE_GROUP" \
+  --vnet-name "$VNET_NAME" \
+  --name "$SUBNET_NAME" \
+  --delegations Microsoft.App/environments
+
 # Create Container Apps environment with VNet integration
 az containerapp env create \
   --name "$ENV_NAME" \
@@ -77,7 +84,7 @@ az containerapp env create \
 az containerapp env show \
   --name "$ENV_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --query "properties.infrastructureSubnetId"
+  --query "properties.vnetConfiguration.infrastructureSubnetId"
 ```
 
 **Important Notes:**

@@ -121,7 +121,7 @@ RESOURCE_GROUP="<your resource group>"
 VNET_ID=$(az containerapp env show \
   --name "$ENV_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --query "properties.infrastructureSubnetId" \
+  --query "properties.vnetConfiguration.infrastructureSubnetId" \
   --output tsv)
 
 # Extract VNet resource group and name from the subnet ID
