@@ -6,7 +6,7 @@ properties:
   configuration:
     activeRevisionsMode: Single
     ingress:
-      external: false
+      external: true
       targetPort: 3001
       allowInsecure: true
   template:
@@ -55,6 +55,8 @@ properties:
             value: "{{.PostgresPassword}}"
           - name: BINDPLANE_POSTGRES_DATABASE
             value: {{.PostgresDatabase}}
+          - name: BINDPLANE_POSTGRES_SSL_MODE
+            value: {{.PostgresSSLMode}}
           - name: BINDPLANE_POSTGRES_MAX_CONNECTIONS
             value: "20"
           - name: BINDPLANE_EVENT_BUS_TYPE

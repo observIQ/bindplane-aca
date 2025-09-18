@@ -18,6 +18,7 @@ type TemplateData struct {
 	PostgresDatabase         string
 	License                  string
 	PostgresPassword         string
+	PostgresSSLMode          string
 	Base64License            string
 	Base64PostgresPassword   string
 	Base64StorageAccountName string
@@ -36,6 +37,7 @@ type Config struct {
 	PostgresDatabase   string
 	License            string
 	PostgresPassword   string
+	PostgresSSLMode    string
 	StorageAccountName string
 	StorageAccountKey  string
 	ResourceGroup      string
@@ -61,6 +63,7 @@ func main() {
 		PostgresDatabase:         config.PostgresDatabase,
 		License:                  config.License,
 		PostgresPassword:         config.PostgresPassword,
+		PostgresSSLMode:          config.PostgresSSLMode,
 		Base64License:            base64.StdEncoding.EncodeToString([]byte(config.License)),
 		Base64PostgresPassword:   base64.StdEncoding.EncodeToString([]byte(config.PostgresPassword)),
 		Base64StorageAccountName: base64.StdEncoding.EncodeToString([]byte(config.StorageAccountName)),
@@ -90,6 +93,7 @@ func parseFlags() *Config {
 	flag.StringVar(&config.PostgresDatabase, "postgres-database", "", "PostgreSQL database name (required)")
 	flag.StringVar(&config.License, "license", "", "Bindplane license key (required)")
 	flag.StringVar(&config.PostgresPassword, "postgres-password", "", "PostgreSQL password (required)")
+	flag.StringVar(&config.PostgresSSLMode, "postgres-ssl-mode", "disabled", "PostgreSQL SSL mode (disabled, require, verify-ca, verify-full)")
 	flag.StringVar(&config.StorageAccountName, "storage-account-name", "", "Azure Storage Account name (required)")
 	flag.StringVar(&config.StorageAccountKey, "storage-account-key", "", "Azure Storage Account key (required)")
 	flag.StringVar(&config.ResourceGroup, "resource-group", "", "Azure Resource Group name (required)")

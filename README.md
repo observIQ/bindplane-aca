@@ -211,6 +211,7 @@ The tool requires several configuration parameters to generate the deployment fi
 | `templates-dir` | `templates` | Directory containing the template files |
 | `bindplane-tag` | `1.94.3` | Image tag for Bindplane components (also used to derive transform-agent and prometheus tags) |
 | `bindplane-remote-url` | `http://localhost:3001` | Remote URL for Bindplane components to communicate with the main application |
+| `postgres-ssl-mode` | `disabled` | PostgreSQL SSL mode: disabled, require, verify-ca, or verify-full |
 
 
 ### Example Usage

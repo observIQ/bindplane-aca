@@ -19,6 +19,7 @@ func TestTemplateProcessing(t *testing.T) {
 		PostgresDatabase:         "test_db",
 		License:                  "test-license-key",
 		PostgresPassword:         "test-password",
+		PostgresSSLMode:          "disabled",
 		Base64License:            base64.StdEncoding.EncodeToString([]byte("test-license-key")),
 		Base64PostgresPassword:   base64.StdEncoding.EncodeToString([]byte("test-password")),
 		Base64StorageAccountName: base64.StdEncoding.EncodeToString([]byte("teststorageaccount")),

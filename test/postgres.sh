@@ -32,13 +32,14 @@ ADMIN_USERNAME="bindplane"
 TIER="Burstable"
 SKU_NAME="Standard_B2s"
 STORAGE_SIZE="128"
-VERSION="13"
+VERSION="16"
 
 echo "Deploying PostgreSQL Flexible Server to Azure..."
 echo "Location: $LOCATION"
 echo "Resource Group: $RESOURCE_GROUP"
 echo "Server Name: $SERVER_NAME"
 echo "Admin Username: $ADMIN_USERNAME"
+echo "Selected PostgreSQL Version: $VERSION"
 
 # Create PostgreSQL Flexible Server
 echo "Creating PostgreSQL Flexible Server..."

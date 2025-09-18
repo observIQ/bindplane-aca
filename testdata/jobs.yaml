@@ -55,6 +55,8 @@ properties:
             value: "test-password"
           - name: BINDPLANE_POSTGRES_DATABASE
             value: test_db
+          - name: BINDPLANE_POSTGRES_SSL_MODE
+            value: disabled
           - name: BINDPLANE_POSTGRES_MAX_CONNECTIONS
             value: "20"
           - name: BINDPLANE_EVENT_BUS_TYPE
