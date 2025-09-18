@@ -308,7 +308,6 @@ This will return a URL similar to: `https://bindplane.jollysand-c93c8cbe.eastus.
 # Update the Container Apps with the new configuration
 az containerapp update --name bindplane --resource-group "$RESOURCE_GROUP" --yaml out/bindplane.yaml
 az containerapp update --name bindplane-jobs --resource-group "$RESOURCE_GROUP" --yaml out/jobs.yaml
-az containerapp update --name bindplane-jobs-migrate --resource-group "$RESOURCE_GROUP" --yaml out/jobs-migrate.yaml
 az containerapp update --name bindplane-nats-0 --resource-group "$RESOURCE_GROUP" --yaml out/nats-0.yaml
 az containerapp update --name bindplane-nats-1 --resource-group "$RESOURCE_GROUP" --yaml out/nats-1.yaml
 az containerapp update --name bindplane-nats-2 --resource-group "$RESOURCE_GROUP" --yaml out/nats-2.yaml
