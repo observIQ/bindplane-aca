@@ -9,6 +9,7 @@ properties:
       external: false
       targetPort: 4568
       allowInsecure: true
+      transport: http
   template:
     containers:
       - name: transform-agent

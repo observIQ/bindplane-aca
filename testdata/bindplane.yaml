@@ -24,7 +24,7 @@ properties:
           - name: BINDPLANE_TRANSFORM_AGENT_ENABLE_REMOTE
             value: "true"
           - name: BINDPLANE_TRANSFORM_AGENT_REMOTE_AGENTS
-            value: "bindplane-transform-agent:4568"
+            value: "bindplane-transform-agent:80"
           - name: BINDPLANE_LICENSE
             value: test-license-key
           - name: BINDPLANE_ACCEPT_EULA
@@ -74,7 +74,7 @@ properties:
           - name: BINDPLANE_PROMETHEUS_HOST
             value: bindplane-prometheus
           - name: BINDPLANE_PROMETHEUS_PORT
-            value: "9090"
+            value: "80"
           - name: BINDPLANE_PROMETHEUS_REMOTE_WRITE_ENDPOINT
             value: /api/v1/write
           - name: BINDPLANE_PROMETHEUS_AUTH_TYPE

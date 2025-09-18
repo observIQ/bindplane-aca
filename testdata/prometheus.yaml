@@ -9,6 +9,7 @@ properties:
       external: false
       allowInsecure: true
       targetPort: 9090
+      transport: http
   template:
     containers:
       - name: prometheus
