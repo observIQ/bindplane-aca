@@ -2,7 +2,7 @@
 
 set -e
 
-# Script to deploy PostgreSQL to Azure
+# Script to deploy PostgreSQL (Flexible Server) to Azure
 # Usage: ./postgres.sh <password>
 # Requires LOCATION and RESOURCE_GROUP environment variables
 
@@ -29,56 +29,41 @@ fi
 # PostgreSQL configuration
 SERVER_NAME="bindplane-postgres-$(date +%s)"
 ADMIN_USERNAME="bindplane"
-SKU_NAME="GP_Gen5_2"
+TIER="Burstable"
+SKU_NAME="Standard_B2s"
 STORAGE_SIZE="128"
 VERSION="13"
 
-echo "Deploying PostgreSQL to Azure..."
+echo "Deploying PostgreSQL Flexible Server to Azure..."
 echo "Location: $LOCATION"
 echo "Resource Group: $RESOURCE_GROUP"
 echo "Server Name: $SERVER_NAME"
 echo "Admin Username: $ADMIN_USERNAME"
 
-# Create PostgreSQL server
-echo "Creating PostgreSQL server..."
-az postgres server create \
+# Create PostgreSQL Flexible Server
+echo "Creating PostgreSQL Flexible Server..."
+az postgres flexible-server create \
     --resource-group "$RESOURCE_GROUP" \
     --name "$SERVER_NAME" \
     --location "$LOCATION" \
     --admin-user "$ADMIN_USERNAME" \
     --admin-password "$PASSWORD" \
+    --tier "$TIER" \
     --sku-name "$SKU_NAME" \
-    --storage-size "${STORAGE_SIZE}GB" \
+    --storage-size "$STORAGE_SIZE" \
     --version "$VERSION" \
-    --public-network-access Enabled
-
-# Configure firewall rule to allow access from any IP
-echo "Configuring firewall rule for public access..."
-az postgres server firewall-rule create \
-    --resource-group "$RESOURCE_GROUP" \
-    --server "$SERVER_NAME" \
-    --name "AllowAllIPs" \
-    --start-ip-address "0.0.0.0" \
-    --end-ip-address "255.255.255.255"
-
-# Enable SSL enforcement (optional but recommended)
-echo "Configuring SSL enforcement..."
-az postgres server configuration set \
-    --resource-group "$RESOURCE_GROUP" \
-    --server "$SERVER_NAME" \
-    --name "require_secure_transport" \
-    --value "on"
+    --public-access all
 
 # Get server details
 echo "Getting server details..."
-FQDN=$(az postgres server show \
+FQDN=$(az postgres flexible-server show \
     --resource-group "$RESOURCE_GROUP" \
     --name "$SERVER_NAME" \
     --query "fullyQualifiedDomainName" \
     --output tsv)
 
 echo ""
-echo "PostgreSQL deployment completed successfully!"
+echo "PostgreSQL Flexible Server deployment completed successfully!"
 echo "=============================================="
 echo "Server Name: $SERVER_NAME"
 echo "FQDN: $FQDN"
