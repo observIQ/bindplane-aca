@@ -32,7 +32,6 @@ func TestTemplateProcessing(t *testing.T) {
 	templateFiles := []string{
 		"bindplane.yaml",
 		"jobs.yaml",
-		"jobs-migrate.yaml",
 		"nats-0.yaml",
 		"nats-1.yaml",
 		"nats-2.yaml",

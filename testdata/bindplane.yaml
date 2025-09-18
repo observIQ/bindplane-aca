@@ -55,14 +55,6 @@ properties:
             value: "test-password"
           - name: BINDPLANE_POSTGRES_DATABASE
             value: test_db
-          - name: BINDPLANE_POSTGRES_SSL_MODE
-            value: disable
-          - name: BINDPLANE_POSTGRES_SSL_ROOT_CERT
-            value: /postgres-tls/ca.crt
-          - name: BINDPLANE_POSTGRES_SSL_CERT
-            value: /postgres-tls/client.crt
-          - name: BINDPLANE_POSTGRES_SSL_KEY
-            value: /postgres-tls/client.key
           - name: BINDPLANE_POSTGRES_MAX_CONNECTIONS
             value: "20"
           - name: BINDPLANE_EVENT_BUS_TYPE

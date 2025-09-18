@@ -1,3 +1,4 @@
 bindplane-aca
 out.yaml
 out/
+*.env
