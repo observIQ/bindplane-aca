@@ -20,7 +20,7 @@ go build -o bindplane-aca main.go
 
 ## Architecture
 
-Bindplane on Azure Container Apps consists of multiple microservices working together to provide a comprehensive observability platform. For detailed information about the architecture, component relationships, and system design, see the [Architecture Documentation](docs/architecture.md).
+Bindplane on Azure Container Apps consists of multiple microservices working together to provide a comprehensive observability platform. For detailed information about the architecture, component relationships, and system design, see the [Architecture Documentation](docs/architecture.md). For telemetry and monitoring details, see the [Telemetry Guide](docs/telemetry.md).
 
 ## Prerequisites Setup
 
@@ -99,7 +99,7 @@ az containerapp env show \
 Ensure your environment can pull the following container images (tags derive from your `-bindplane-tag` value):
 
 - `ghcr.io/observiq/bindplane-ee:<BindplaneTag>`
-  - Used by `bindplane`, `bindplane-jobs`, `bindplane-jobs-migrate`, and all `bindplane-nats-*` apps
+  - Used by `bindplane`, `bindplane-jobs`, and all `bindplane-nats-*` apps
 - `ghcr.io/observiq/bindplane-transform-agent:<BindplaneTag>-bindplane`
   - Used by `bindplane-transform-agent`
 - `ghcr.io/observiq/bindplane-prometheus:<BindplaneTag>`

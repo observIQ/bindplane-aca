@@ -4,43 +4,38 @@ This document describes the architecture of Bindplane when deployed on Azure Con
 
 ## Architecture Overview
 
-Bindplane on Azure Container Apps follows a hybrid architecture with six main components. Rather than traditional microservices, most components utilize the same Bindplane container image (`ghcr.io/observiq/bindplane-ee`) configured with different operational modes to perform specialized functions. This approach provides the benefits of service separation while maintaining consistency and simplifying deployment. The deployment is designed to be cloud-native, leveraging Azure Container Apps' scaling and orchestration features.
+Bindplane on Azure Container Apps follows a hybrid architecture with five main components. Rather than traditional microservices, most components utilize the same Bindplane container image (`ghcr.io/observiq/bindplane-ee`) configured with different operational modes to perform specialized functions. This approach provides the benefits of service separation while maintaining consistency and simplifying deployment. The deployment is designed to be cloud-native, leveraging Azure Container Apps' scaling and orchestration features.
 
 ### Architecture Pattern
 
-The core Bindplane components (Bindplane main application, Jobs, Jobs Migrate, and NATS cluster) all run the same container image but are configured with different `BINDPLANE_MODE` values to specialize their behavior:
+The core Bindplane components (Bindplane main application, Jobs, and NATS cluster) all run the same container image but are configured with different `BINDPLANE_MODE` values to specialize their behavior:
 
 - **Single Codebase, Multiple Roles**: All Bindplane components share the same binary but operate in different modes
 - **Configuration-Driven Specialization**: Each component's role is determined by environment variables rather than separate codebases
 - **Hybrid Service Model**: Combines the operational benefits of microservices (independent scaling, deployment) with the maintenance benefits of a monolithic codebase
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                 Azure Container Apps Environment                    │
-│                                                                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │
-│  │  Bindplane  │  │    Jobs     │  │Jobs Migrate │  │ Transform   │ │
-│  │    (1-3)    │◄►│     (1)     │  │     (1)     │◄►│  Agent (2)  │ │
-│  │             │  │             │  │             │  │             │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘ │
-│         │                   │             │               │        │
-│         └───────────────────┼─────────────┼───────────────┘        │
-│                             │             │                        │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐             │
-│  │    NATS     │    │ Prometheus  │    │  External   │             │
-│  │   Cluster   │◄──►│     (1)     │    │  Services   │             │
-│  │     (3)     │    │             │    │             │             │
-│  └─────────────┘    └─────────────┘    └─────────────┘             │
-│         │                   │                   │                  │
-│         └───────────────────┼───────────────────┼──────────────────┤
-│                             │                   │                  │
-└─────────────────────────────┼───────────────────┼──────────────────┘
-                              │                   │
-                    ┌─────────────┐    ┌─────────────┐
-                    │ PostgreSQL  │    │   Azure     │
-                    │  Database   │    │  Storage    │
-                    │ (External)  │    │ (External)  │
-                    └─────────────┘    └─────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│           Azure Container Apps Environment                    │
+│                                                               │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐          │
+│  │  Bindplane  │   │    Jobs     │   │ Transform   │          │
+│  │    (1-N)    │◄─►│     (1)     │◄─►│  Agent (2)  │          │
+│  └─────────────┘   └─────────────┘   └─────────────┘          │
+│          │                    │                    │          │
+│          └──────────────┬─────┼─────┬──────────────┘          │
+│                         │     │     │                         │
+│                  ┌─────▼─────▼─────▼─────┐    ┌─────────────┐ │
+│                  │         NATS          │    │  Prometheus │ │
+│                  │       Cluster (3)     │    │     (1)     │ │
+│                  └───────────────────────┘    └─────────────┘ │
+└───────────────────────────────────────────────────────────────┘
+           │
+  ┌────────▼────────┐    ┌─────────────┐
+  │   PostgreSQL    │    │   Azure     │
+  │    Database     │    │  Storage    │
+  │   (External)    │    │ (External)  │
+  └─────────────────┘    └─────────────┘
 ```
 
 ## Core Components
@@ -70,11 +65,11 @@ capabilities.
 
 ### 2. Jobs Component
 
-**Purpose**: Handles background processing tasks and long-running operations, excluding database migrations.
+**Purpose**: Handles background processing tasks and long-running operations. Creates the initial database schema for new deployments and manages database migrations during upgrades.
 
 **Architecture Details**:
 - **Container Image**: `ghcr.io/observiq/bindplane-ee`
-- **Mode**: `all,-migrate` - Performs all duties but disables database migrations
+- **Mode**: `all` - Performs all duties
 - **Replicas**: 1 (single instance for job coordination)
 - **Ingress**: Internal only
 - **Dependencies**: NATS, PostgreSQL, Prometheus, Transform Agent
@@ -84,29 +79,13 @@ capabilities.
 - Scheduled jobs (disconnected agent cleanup, interval based tasks)
 - Background task processing
 - Resource seeding
+- Database initialization for new deployments
+- Database schema migrations during upgrades
 - Operates NATS client for messaging with the NATS cluster
 
-### 3. Jobs Migrate Component
+### 3. Transform Agent
 
-**Purpose**: Handles database migrations exclusively during deployment and updates.
-
-**Architecture Details**:
-- **Container Image**: `ghcr.io/observiq/bindplane-ee`
-- **Mode**: `migrate` - Performs database migrations only
-- **Replicas**: 1 (single instance for migration coordination)
-- **Ingress**: Internal only
-- **Dependencies**: PostgreSQL
-- **Ports**: Health check on `/health` endpoint
-
-**Key Responsibilities**:
-- Database schema migrations
-- Database initialization during deployment
-- Database upgrades during updates
-- Operates NATS client for messaging with the NATS cluster
-
-### 4. Transform Agent
-
-**Purpose**: Provides data transformation and processing capabilities for telemetry data.
+**Purpose**: Facilitates Bindplane [Live Preview](https://bindplane.com/docs/feature-guides/live-preview) by executing transformation pipelines for preview sessions.
 
 **Architecture Details**:
 - **Container Image**: `ghcr.io/observiq/bindplane-transform-agent`
@@ -117,13 +96,7 @@ capabilities.
   - 4568: Transform service endpoint
   - Health check on `/collector-version` endpoint
 
-**Key Responsibilities**:
-- Data transformation and enrichment
-- Format conversion (logs, metrics, traces)
-- Data validation and filtering
-- Custom transformation logic execution
-
-### 5. NATS Cluster
+### 4. NATS Cluster
 
 **Purpose**: Bindplane server processes that operate embedded [NATS](https://github.com/nats-io/nats-server) servers for message bus and event streaming platform functionality. Each Bindplane server instance publishes messages for other Bindplane servers to consume, enabling distributed coordination and data sharing across the cluster.
 
@@ -131,11 +104,12 @@ capabilities.
 - **Container Image**: `ghcr.io/observiq/bindplane-ee`
 - **Replicas**: 3 (clustered for high availability)
 - **Ingress**: Internal only
-- **Dependencies**: None for persistence (uses `EmptyDir` for Bindplane scratch storage)
 - **Ports**:
   - 4222: Client connections
   - 6222: Cluster mesh communication
   - 8222: HTTP monitoring and health checks
+  
+  Note: NATS does not connect to PostgreSQL. It must start and be available before the Jobs component so that Jobs can initialize the database and run migrations while coordinating via NATS.
 
 **Key Responsibilities**:
 - Inter-service messaging and communication
@@ -155,7 +129,7 @@ capabilities.
 - Each Bindplane server instance runs an embedded NATS server that participates in the cluster
 - Uses `EmptyDir` volume for Bindplane scratch storage; no Azure Files required
 
-### 6. Prometheus
+### 5. Prometheus
 
 **Purpose**: Internal metrics storage for Bindplane collector throughput and health metrics. This is not intended for consumption by external monitoring tools like Grafana and does not store Bindplane's operational metrics.
 
@@ -185,7 +159,7 @@ capabilities.
 **Purpose**: Primary database for Bindplane configuration, metadata, and operational data.
 
 **Integration**:
-- Only the main Bindplane application, Jobs component, and Jobs Migrate component connect to PostgreSQL
+- Only the main Bindplane application and Jobs component connect to PostgreSQL
 - NATS, Prometheus, and Transform Agent components do not connect to PostgreSQL
 - Stores agent configurations, user data, and system state
 - Configured with SSL connections for security
@@ -228,7 +202,6 @@ All components communicate within the Azure Container Apps Environment using int
 
 - **Bindplane**: Can scale from 1-3 replicas based on user load
 - **Jobs**: Single instance (ensures job coordination)
-- **Jobs Migrate**: Single instance (ensures migration coordination)
 - **Transform Agent**: Runs with 2 replicas and can be scaled independently for data processing load
 - **NATS**: Fixed at 3 replicas (clustering requirement)
 - **Prometheus**: Single instance with persistent storage
