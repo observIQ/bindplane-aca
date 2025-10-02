@@ -27,25 +27,39 @@ type TemplateData struct {
 	BindplaneTag             string
 	SessionSecret            string
 	BindplaneRemoteURL       string
+	AzureConnectionString    string
+	AzureTopic               string
+	AzureSubscriptionID      string
+	AzureResourceGroup       string
+	AzureNamespace           string
+	ManagedIdentityID        string
+	AzureClientID            string
 }
 
 // Config holds command line arguments
 type Config struct {
-	ACAEnvironmentID   string
-	PostgresHost       string
-	PostgresUsername   string
-	PostgresDatabase   string
-	License            string
-	PostgresPassword   string
-	PostgresSSLMode    string
-	StorageAccountName string
-	StorageAccountKey  string
-	ResourceGroup      string
-	OutputDir          string
-	TemplatesDir       string
-	BindplaneTag       string
-	SessionSecret      string
-	BindplaneRemoteURL string
+	ACAEnvironmentID      string
+	PostgresHost          string
+	PostgresUsername      string
+	PostgresDatabase      string
+	License               string
+	PostgresPassword      string
+	PostgresSSLMode       string
+	StorageAccountName    string
+	StorageAccountKey     string
+	ResourceGroup         string
+	OutputDir             string
+	TemplatesDir          string
+	BindplaneTag          string
+	SessionSecret         string
+	BindplaneRemoteURL    string
+	AzureConnectionString string
+	AzureTopic            string
+	AzureSubscriptionID   string
+	AzureResourceGroup    string
+	AzureNamespace        string
+	ManagedIdentityID     string
+	AzureClientID         string
 }
 
 func main() {
@@ -72,6 +86,13 @@ func main() {
 		BindplaneTag:             config.BindplaneTag,
 		SessionSecret:            config.SessionSecret,
 		BindplaneRemoteURL:       config.BindplaneRemoteURL,
+		AzureConnectionString:    config.AzureConnectionString,
+		AzureTopic:               config.AzureTopic,
+		AzureSubscriptionID:      config.AzureSubscriptionID,
+		AzureResourceGroup:       config.AzureResourceGroup,
+		AzureNamespace:           config.AzureNamespace,
+		ManagedIdentityID:        config.ManagedIdentityID,
+		AzureClientID:            config.AzureClientID,
 	}
 
 	if err := processTemplates(config, templateData); err != nil {
@@ -93,7 +114,7 @@ func parseFlags() *Config {
 	flag.StringVar(&config.PostgresDatabase, "postgres-database", "", "PostgreSQL database name (required)")
 	flag.StringVar(&config.License, "license", "", "Bindplane license key (required)")
 	flag.StringVar(&config.PostgresPassword, "postgres-password", "", "PostgreSQL password (required)")
-	flag.StringVar(&config.PostgresSSLMode, "postgres-ssl-mode", "disabled", "PostgreSQL SSL mode (disabled, require, verify-ca, verify-full)")
+	flag.StringVar(&config.PostgresSSLMode, "postgres-ssl-mode", "disable", "PostgreSQL SSL mode (disable, require, verify-ca, verify-full)")
 	flag.StringVar(&config.StorageAccountName, "storage-account-name", "", "Azure Storage Account name (required)")
 	flag.StringVar(&config.StorageAccountKey, "storage-account-key", "", "Azure Storage Account key (required)")
 	flag.StringVar(&config.ResourceGroup, "resource-group", "", "Azure Resource Group name (required)")
@@ -102,6 +123,13 @@ func parseFlags() *Config {
 	flag.StringVar(&config.BindplaneTag, "bindplane-tag", "1.94.3", "Bindplane image tag (default 1.94.3)")
 	flag.StringVar(&config.SessionSecret, "session-secret", "", "Bindplane session secret (required)")
 	flag.StringVar(&config.BindplaneRemoteURL, "bindplane-remote-url", "http://localhost:3001", "Bindplane remote URL (default http://localhost:3001)")
+	flag.StringVar(&config.AzureConnectionString, "azure-connection-string", "", "Azure Service Bus connection string (required)")
+	flag.StringVar(&config.AzureTopic, "azure-topic", "", "Azure Service Bus topic name (required)")
+	flag.StringVar(&config.AzureSubscriptionID, "azure-subscription-id", "", "Azure subscription ID (required)")
+	flag.StringVar(&config.AzureResourceGroup, "azure-resource-group", "", "Azure resource group name (required)")
+	flag.StringVar(&config.AzureNamespace, "azure-namespace", "", "Azure Service Bus namespace (required)")
+	flag.StringVar(&config.ManagedIdentityID, "managed-identity-id", "", "User-assigned managed identity ID (required)")
+	flag.StringVar(&config.AzureClientID, "azure-client-id", "", "Azure managed identity client ID (required)")
 
 	flag.Parse()
 
@@ -110,16 +138,23 @@ func parseFlags() *Config {
 
 func validateConfig(config *Config) error {
 	required := map[string]string{
-		"aca-environment-id":   config.ACAEnvironmentID,
-		"postgres-host":        config.PostgresHost,
-		"postgres-username":    config.PostgresUsername,
-		"postgres-database":    config.PostgresDatabase,
-		"license":              config.License,
-		"postgres-password":    config.PostgresPassword,
-		"storage-account-name": config.StorageAccountName,
-		"storage-account-key":  config.StorageAccountKey,
-		"resource-group":       config.ResourceGroup,
-		"session-secret":       config.SessionSecret,
+		"aca-environment-id":      config.ACAEnvironmentID,
+		"postgres-host":           config.PostgresHost,
+		"postgres-username":       config.PostgresUsername,
+		"postgres-database":       config.PostgresDatabase,
+		"license":                 config.License,
+		"postgres-password":       config.PostgresPassword,
+		"storage-account-name":    config.StorageAccountName,
+		"storage-account-key":     config.StorageAccountKey,
+		"resource-group":          config.ResourceGroup,
+		"session-secret":          config.SessionSecret,
+		"azure-connection-string": config.AzureConnectionString,
+		"azure-topic":             config.AzureTopic,
+		"azure-subscription-id":   config.AzureSubscriptionID,
+		"azure-resource-group":    config.AzureResourceGroup,
+		"azure-namespace":         config.AzureNamespace,
+		"managed-identity-id":     config.ManagedIdentityID,
+		"azure-client-id":         config.AzureClientID,
 	}
 
 	var missing []string
@@ -146,9 +181,6 @@ func processTemplates(config *Config, data *TemplateData) error {
 	templateFiles := []string{
 		"bindplane.yaml",
 		"jobs.yaml",
-		"nats-0.yaml",
-		"nats-1.yaml",
-		"nats-2.yaml",
 		"prometheus.yaml",
 		"transform-agent.yaml",
 	}
@@ -216,21 +248,13 @@ func generateDeploymentCommands(config *Config) {
 		"echo \"1. Deploying Transform Agent...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-transform-agent --resource-group %s --yaml %s/transform-agent.yaml", config.ResourceGroup, config.OutputDir),
 		"",
-		"echo \"2. Deploying NATS cluster apps...\"",
-		fmt.Sprintf("az containerapp create --name bindplane-nats-0 --resource-group %s --yaml %s/nats-0.yaml", config.ResourceGroup, config.OutputDir),
-		fmt.Sprintf("az containerapp create --name bindplane-nats-1 --resource-group %s --yaml %s/nats-1.yaml", config.ResourceGroup, config.OutputDir),
-		fmt.Sprintf("az containerapp create --name bindplane-nats-2 --resource-group %s --yaml %s/nats-2.yaml", config.ResourceGroup, config.OutputDir),
-		"",
-		"echo \"3. Deploying Prometheus...\"",
+		"echo \"2. Deploying Prometheus...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-prometheus --resource-group %s --yaml %s/prometheus.yaml", config.ResourceGroup, config.OutputDir),
 		"",
-		"echo \"3. Deploying Transform Agent...\"",
-		fmt.Sprintf("az containerapp create --name bindplane-transform-agent --resource-group %s --yaml %s/transform-agent.yaml", config.ResourceGroup, config.OutputDir),
-		"",
-		"echo \"4. Deploying Jobs component...\"",
+		"echo \"3. Deploying Jobs component...\"",
 		fmt.Sprintf("az containerapp create --name bindplane-jobs --resource-group %s --yaml %s/jobs.yaml", config.ResourceGroup, config.OutputDir),
 		"",
-		"echo \"5. Deploying main Bindplane application...\"",
+		"echo \"4. Deploying main Bindplane application...\"",
 		fmt.Sprintf("az containerapp create --name bindplane --resource-group %s --yaml %s/bindplane.yaml", config.ResourceGroup, config.OutputDir),
 		"",
 		"echo \"Deployment complete!\"",

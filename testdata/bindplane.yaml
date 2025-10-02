@@ -9,6 +9,10 @@ properties:
       external: true
       targetPort: 3001
       allowInsecure: true
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      test-managed-identity-id: {}
   template:
     containers:
       - name: server
@@ -60,11 +64,19 @@ properties:
           - name: BINDPLANE_POSTGRES_MAX_CONNECTIONS
             value: "20"
           - name: BINDPLANE_EVENT_BUS_TYPE
-            value: nats
-          - name: BINDPLANE_NATS_CLIENT_ENDPOINT
-            value: nats://bindplane-nats-0:4222,nats://bindplane-nats-1:4222,nats://bindplane-nats-2:4222
-          - name: BINDPLANE_NATS_CLIENT_SUBJECT
-            value: bindplane-event-bus
+            value: azure
+          - name: BINDPLANE_AZURE_CONNECTION_STRING
+            value: test-connection-string
+          - name: BINDPLANE_AZURE_TOPIC
+            value: test-topic
+          - name: BINDPLANE_AZURE_SUBSCRIPTION_ID
+            value: test-subscription-id
+          - name: BINDPLANE_AZURE_RESOURCE_GROUP
+            value: test-rg
+          - name: BINDPLANE_AZURE_NAMESPACE
+            value: test-namespace
+          - name: AZURE_CLIENT_ID
+            value: test-client-id
           - name: BINDPLANE_PORT
             value: "3001"
           - name: BINDPLANE_PROMETHEUS_ENABLE
@@ -85,6 +97,10 @@ properties:
             value: /metrics
           - name: BINDPLANE_LOGGING_LEVEL
             value: debug
+          - name: BINDPLANE_EVENT_BUS_HEALTH_REQUIRED_ACKS
+            value: "2"
+          - name: BINDPLANE_EVENT_BUS_HEALTH_MAX_ACKS
+            value: "6"
         probes:
           - type: liveness
             httpGet:
@@ -103,5 +119,5 @@ properties:
             timeoutSeconds: 1
             failureThreshold: 3
     scale:
-      minReplicas: 2
+      minReplicas: 5
       maxReplicas: 10
