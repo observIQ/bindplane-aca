@@ -1,4 +1,4 @@
-name: bindplane
+name: bindplane-jobs-migrate
 type: Microsoft.App/containerApps
 location: eastus
 properties:
@@ -6,7 +6,7 @@ properties:
   configuration:
     activeRevisionsMode: Single
     ingress:
-      external: true
+      external: false
       targetPort: 3001
       allowInsecure: true
   template:
@@ -14,17 +14,17 @@ properties:
       - name: server
         image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
         resources:
-          cpu: 2.0
+          cpu: 2
           memory: 4Gi
         env:
           - name: BINDPLANE_MODE
-            value: node
+            value: migrate
           - name: BINDPLANE_ANALYTICS_DISABLED
             value: "false"
           - name: BINDPLANE_TRANSFORM_AGENT_ENABLE_REMOTE
             value: "true"
           - name: BINDPLANE_TRANSFORM_AGENT_REMOTE_AGENTS
-            value: "bindplane-transform-agent:80"
+            value: "bindplane-transform-agent:4568"
           - name: BINDPLANE_LICENSE
             value: {{.License}}
           - name: BINDPLANE_ACCEPT_EULA
@@ -56,7 +56,13 @@ properties:
           - name: BINDPLANE_POSTGRES_DATABASE
             value: {{.PostgresDatabase}}
           - name: BINDPLANE_POSTGRES_SSL_MODE
-            value: {{.PostgresSSLMode}}
+            value: disable
+          - name: BINDPLANE_POSTGRES_SSL_ROOT_CERT
+            value: /postgres-tls/ca.crt
+          - name: BINDPLANE_POSTGRES_SSL_CERT
+            value: /postgres-tls/client.crt
+          - name: BINDPLANE_POSTGRES_SSL_KEY
+            value: /postgres-tls/client.key
           - name: BINDPLANE_POSTGRES_MAX_CONNECTIONS
             value: "20"
           - name: BINDPLANE_EVENT_BUS_TYPE
@@ -74,7 +80,7 @@ properties:
           - name: BINDPLANE_PROMETHEUS_HOST
             value: bindplane-prometheus
           - name: BINDPLANE_PROMETHEUS_PORT
-            value: "80"
+            value: "9090"
           - name: BINDPLANE_PROMETHEUS_REMOTE_WRITE_ENDPOINT
             value: /api/v1/write
           - name: BINDPLANE_PROMETHEUS_AUTH_TYPE
@@ -107,5 +113,5 @@ properties:
             timeoutSeconds: 1
             failureThreshold: 3
     scale:
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 1

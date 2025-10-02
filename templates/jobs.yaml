@@ -85,6 +85,10 @@ properties:
             value: /metrics
           - name: BINDPLANE_LOGGING_LEVEL
             value: debug
+          - name: BINDPLANE_EVENT_BUS_HEALTH_REQUIRED_ACKS
+            value: "3"
+          - name: BINDPLANE_EVENT_BUS_HEALTH_MAX_ACKS
+            value: "7"
         probes:
           - type: liveness
             httpGet:

@@ -99,6 +99,10 @@ properties:
             value: bindplane-event-bus
           - name: BINDPLANE_PORT
             value: "3001"
+          - name: BINDPLANE_EVENT_BUS_HEALTH_REQUIRED_ACKS
+            value: "3"
+          - name: BINDPLANE_EVENT_BUS_HEALTH_MAX_ACKS
+            value: "7"
         volumeMounts:
           - volumeName: data
             mountPath: /data
