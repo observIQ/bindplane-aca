@@ -115,28 +115,6 @@ echo "Service Bus Connection String: $SERVICE_BUS_CONNECTION"
 echo "Subscription ID: $SUBSCRIPTION_ID"
 ```
 
-### 2.4 Grant Service Bus permissions to the Container Apps environment identity
-
-We'll use a system-assigned managed identity on the Container Apps environment. After creating the environment and assigning the identity in Step 3, grant it Service Bus permissions:
-
-```bash
-# Get the Service Bus namespace resource ID
-SERVICE_BUS_ID="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ServiceBus/namespaces/$SERVICE_BUS_NAMESPACE"
-
-# Get the environment principal ID (after identity is assigned in Step 3)
-ENV_PRINCIPAL_ID=$(az containerapp env show \
-  --name "$ENV_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query "identity.principalId" \
-  --output tsv)
-
-# Assign Service Bus Data Owner role to the environment identity
-az role assignment create \
-  --assignee "$ENV_PRINCIPAL_ID" \
-  --role "Azure Service Bus Data Owner" \
-  --scope "$SERVICE_BUS_ID"
-```
-
 **Important Notes:**
 - The Container Apps environment should be created with managed identity enabled for automatic authentication
 - Bindplane will automatically create its own subscriptions when connecting to the topic
@@ -179,6 +157,28 @@ ACA_ENVIRONMENT_ID=$(az containerapp env show \
   --output tsv)
 
 echo "Container Apps Environment ID: $ACA_ENVIRONMENT_ID"
+```
+
+### 3.2 Grant Service Bus permissions to the environment identity
+
+Once the environment exists and has a system-assigned identity, grant it permissions on the Service Bus namespace:
+
+```bash
+# Service Bus namespace resource ID
+SERVICE_BUS_ID="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ServiceBus/namespaces/$SERVICE_BUS_NAMESPACE"
+
+# Environment principal ID
+ENV_PRINCIPAL_ID=$(az containerapp env show \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "identity.principalId" \
+  --output tsv)
+
+# Assign role
+az role assignment create \
+  --assignee "$ENV_PRINCIPAL_ID" \
+  --role "Azure Service Bus Data Owner" \
+  --scope "$SERVICE_BUS_ID"
 ```
 
 **Important Notes:**
