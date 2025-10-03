@@ -159,27 +159,24 @@ ACA_ENVIRONMENT_ID=$(az containerapp env show \
 echo "Container Apps Environment ID: $ACA_ENVIRONMENT_ID"
 ```
 
-### 3.2 Grant Service Bus permissions to the environment identity
-
-Once the environment exists and has a system-assigned identity, grant it permissions on the Service Bus namespace:
+### 3.1 Pre-create a User-Assigned Identity (recommended)
 
 ```bash
-# Service Bus namespace resource ID
+# Create a user-assigned managed identity for all apps
+UAI_NAME="bindplane-uai"
+UAI_ID=$(az identity create --name "$UAI_NAME" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+UAI_PRINCIPAL_ID=$(az identity show --name "$UAI_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
+UAI_CLIENT_ID=$(az identity show --name "$UAI_NAME" --resource-group "$RESOURCE_GROUP" --query clientId -o tsv)
+
+# Grant Service Bus Data Owner at namespace scope
 SERVICE_BUS_ID="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ServiceBus/namespaces/$SERVICE_BUS_NAMESPACE"
+az role assignment create --assignee "$UAI_PRINCIPAL_ID" --role "Azure Service Bus Data Owner" --scope "$SERVICE_BUS_ID"
 
-# Environment principal ID
-ENV_PRINCIPAL_ID=$(az containerapp env show \
-  --name "$ENV_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query "identity.principalId" \
-  --output tsv)
-
-# Assign role
-az role assignment create \
-  --assignee "$ENV_PRINCIPAL_ID" \
-  --role "Azure Service Bus Data Owner" \
-  --scope "$SERVICE_BUS_ID"
+echo "UAI_ID=$UAI_ID"
+echo "UAI_CLIENT_ID=$UAI_CLIENT_ID"
 ```
+
+ 
 
 **Important Notes:**
 - The `--infrastructure-subnet-resource-id` parameter enables VNet integration
@@ -258,7 +255,7 @@ cd bindplane-aca
 go build -o bindplane-aca main.go
 ```
 
-### 5.2 Generate Deployment Files
+### 5.2 Generate Deployment Files (with User-Assigned Identity)
 
 Now that all prerequisites are set up, generate the deployment files:
 
@@ -288,6 +285,8 @@ SESSION_SECRET="$(uuidgen)"  # Generate a random session secret
   -azure-subscription-id "$SUBSCRIPTION_ID" \
   -azure-resource-group "$RESOURCE_GROUP" \
   -azure-namespace "$SERVICE_BUS_NAMESPACE" \
+  -managed-identity-id "$UAI_ID" \
+  -azure-client-id "$UAI_CLIENT_ID" \
   -bindplane-tag "1.94.3"
 ```
 
@@ -298,6 +297,8 @@ SESSION_SECRET="$(uuidgen)"  # Generate a random session secret
 chmod +x out/deploy.sh
 ./out/deploy.sh
 ```
+
+With this UAI approach, no per-app RBAC is required; all apps use the same identity and pre-granted permissions. Ensure your templates have `identity: type: UserAssigned` and include `AZURE_CLIENT_ID` for the UAI client ID.
 
 ## Architecture
 

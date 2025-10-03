@@ -1,6 +1,10 @@
 name: bindplane
 type: Microsoft.App/containerApps
 location: eastus
+identity:
+  type: UserAssigned
+  userAssignedIdentities:
+    test-managed-identity-id: {}
 properties:
   managedEnvironmentId: test-env-12345
   configuration:
@@ -9,8 +13,6 @@ properties:
       external: true
       targetPort: 3001
       allowInsecure: true
-  identity:
-    type: SystemAssigned
   template:
     containers:
       - name: server
@@ -73,6 +75,8 @@ properties:
             value: test-rg
           - name: BINDPLANE_AZURE_NAMESPACE
             value: test-namespace
+          - name: AZURE_CLIENT_ID
+            value: test-client-id
           - name: BINDPLANE_PORT
             value: "3001"
           - name: BINDPLANE_PROMETHEUS_ENABLE

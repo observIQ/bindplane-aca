@@ -1,6 +1,10 @@
 name: bindplane-jobs
 type: Microsoft.App/containerApps
 location: eastus
+identity:
+  type: UserAssigned
+  userAssignedIdentities:
+    {{.ManagedIdentityID}}: {}
 properties:
   managedEnvironmentId: {{.ACAEnvironmentID}}
   configuration:
@@ -9,8 +13,6 @@ properties:
       external: false
       targetPort: 3001
       allowInsecure: true
-  identity:
-    type: SystemAssigned
   template:
     containers:
       - name: server
@@ -73,6 +75,8 @@ properties:
             value: {{.AzureResourceGroup}}
           - name: BINDPLANE_AZURE_NAMESPACE
             value: {{.AzureNamespace}}
+          - name: AZURE_CLIENT_ID
+            value: {{.AzureClientID}}
           - name: BINDPLANE_PORT
             value: "3001"
           - name: BINDPLANE_PROMETHEUS_ENABLE
