@@ -10,9 +10,7 @@ properties:
       targetPort: 3001
       allowInsecure: true
   identity:
-    type: UserAssigned
-    userAssignedIdentities:
-      {{.ManagedIdentityID}}: {}
+    type: SystemAssigned
   template:
     containers:
       - name: server
@@ -75,8 +73,6 @@ properties:
             value: {{.AzureResourceGroup}}
           - name: BINDPLANE_AZURE_NAMESPACE
             value: {{.AzureNamespace}}
-          - name: AZURE_CLIENT_ID
-            value: {{.AzureClientID}}
           - name: BINDPLANE_PORT
             value: "3001"
           - name: BINDPLANE_PROMETHEUS_ENABLE

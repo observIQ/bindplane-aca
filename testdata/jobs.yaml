@@ -10,9 +10,7 @@ properties:
       targetPort: 3001
       allowInsecure: true
   identity:
-    type: UserAssigned
-    userAssignedIdentities:
-      test-managed-identity-id: {}
+    type: SystemAssigned
   template:
     containers:
       - name: server
@@ -75,8 +73,6 @@ properties:
             value: test-rg
           - name: BINDPLANE_AZURE_NAMESPACE
             value: test-namespace
-          - name: AZURE_CLIENT_ID
-            value: test-client-id
           - name: BINDPLANE_PORT
             value: "3001"
           - name: BINDPLANE_PROMETHEUS_ENABLE

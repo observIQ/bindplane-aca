@@ -16,7 +16,7 @@ Before deploying Bindplane to Azure Container Apps, ensure you have:
 This guide follows a logical deployment order where all prerequisites are set up before creating the Container Apps Environment:
 
 1. **Authentication & Networking Setup** - Create VNet and subnets
-2. **Azure Service Bus Setup** - Create namespace, topic, and managed identity
+2. **Azure Service Bus Setup** - Create namespace and topic
 3. **Container Apps Environment** - Create environment with managed identity support
 4. **Storage Configuration** - Set up Azure Files and private endpoints
 5. **Bindplane Deployment** - Generate and deploy Container Apps
@@ -115,46 +115,27 @@ echo "Service Bus Connection String: $SERVICE_BUS_CONNECTION"
 echo "Subscription ID: $SUBSCRIPTION_ID"
 ```
 
-### 2.4 Create and configure managed identity
+### 2.4 Grant Service Bus permissions to the Container Apps environment identity
 
-Create a user-assigned managed identity and grant it Service Bus permissions before deploying the Container Apps:
+We'll use a system-assigned managed identity on the Container Apps environment. After creating the environment and assigning the identity in Step 3, grant it Service Bus permissions:
 
 ```bash
-# Create a user-assigned managed identity
-MANAGED_IDENTITY_NAME="bindplane-managed-identity"
-MANAGED_IDENTITY_ID=$(az identity create \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$MANAGED_IDENTITY_NAME" \
-  --query "id" \
-  --output tsv)
-
-MANAGED_IDENTITY_PRINCIPAL_ID=$(az identity show \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$MANAGED_IDENTITY_NAME" \
-  --query "principalId" \
-  --output tsv)
-
-MANAGED_IDENTITY_CLIENT_ID=$(az identity show \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$MANAGED_IDENTITY_NAME" \
-  --query "clientId" \
-  --output tsv)
-
 # Get the Service Bus namespace resource ID
 SERVICE_BUS_ID="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ServiceBus/namespaces/$SERVICE_BUS_NAMESPACE"
 
-# Assign Service Bus Data Owner role to the managed identity
+# Get the environment principal ID (after identity is assigned in Step 3)
+ENV_PRINCIPAL_ID=$(az containerapp env show \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "identity.principalId" \
+  --output tsv)
+
+# Assign Service Bus Data Owner role to the environment identity
 az role assignment create \
-  --assignee "$MANAGED_IDENTITY_PRINCIPAL_ID" \
+  --assignee "$ENV_PRINCIPAL_ID" \
   --role "Azure Service Bus Data Owner" \
   --scope "$SERVICE_BUS_ID"
-
-echo "Managed Identity ID: $MANAGED_IDENTITY_ID"
-echo "Managed Identity Principal ID: $MANAGED_IDENTITY_PRINCIPAL_ID"
-echo "Managed Identity Client ID: $MANAGED_IDENTITY_CLIENT_ID"
 ```
-
-**Important**: Save both the managed identity ID (`$MANAGED_IDENTITY_ID`) and client ID (`$MANAGED_IDENTITY_CLIENT_ID`) as you'll need them when generating the deployment files.
 
 **Important Notes:**
 - The Container Apps environment should be created with managed identity enabled for automatic authentication
@@ -166,7 +147,7 @@ echo "Managed Identity Client ID: $MANAGED_IDENTITY_CLIENT_ID"
 
 ## Step 3: Container Apps Environment Setup
 
-Now create the Container Apps Environment with managed identity support:
+Now create the Container Apps Environment and assign a system-assigned managed identity:
 
 ```bash
 # Create Container Apps environment with VNet integration and managed identity
@@ -176,8 +157,13 @@ az containerapp env create \
   --location "$LOCATION" \
   --infrastructure-subnet-resource-id "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$SUBNET_NAME" \
   --internal-only false \
-  --enable-workload-profiles \
-  --enable-managed-identity
+  --enable-workload-profiles
+
+# Assign a system-assigned managed identity to the environment
+az containerapp env identity assign \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --system-assigned
 
 # Verify the environment was created with VNet integration
 az containerapp env show \
@@ -198,7 +184,7 @@ echo "Container Apps Environment ID: $ACA_ENVIRONMENT_ID"
 **Important Notes:**
 - The `--infrastructure-subnet-resource-id` parameter enables VNet integration
 - The `--internal-only false` parameter allows both internal and external traffic
-- The `--enable-managed-identity` parameter enables managed identity support
+- Assign a system-assigned managed identity using `az containerapp env identity assign`
 - The subnet must have at least `/24` CIDR (256 IPs) for Container Apps
 
 ## Step 4: Storage Configuration
@@ -302,8 +288,6 @@ SESSION_SECRET="$(uuidgen)"  # Generate a random session secret
   -azure-subscription-id "$SUBSCRIPTION_ID" \
   -azure-resource-group "$RESOURCE_GROUP" \
   -azure-namespace "$SERVICE_BUS_NAMESPACE" \
-  -managed-identity-id "$MANAGED_IDENTITY_ID" \
-  -azure-client-id "$MANAGED_IDENTITY_CLIENT_ID" \
   -bindplane-tag "1.94.3"
 ```
 
@@ -353,8 +337,6 @@ The tool requires several configuration parameters to generate the deployment fi
   -azure-subscription-id "your-subscription-id" \
   -azure-resource-group "your-resource-group" \
   -azure-namespace "your-service-bus-namespace" \
-  -managed-identity-id "your-managed-identity-id" \
-  -azure-client-id "your-managed-identity-client-id" \
   -bindplane-tag "1.94.3"
 ```
 
@@ -407,8 +389,7 @@ export SERVICE_BUS_CONNECTION="your-service-bus-connection-string"
 export SERVICE_BUS_TOPIC="bindplane-events"
 export SUBSCRIPTION_ID="your-subscription-id"
 export SERVICE_BUS_NAMESPACE="your-service-bus-namespace"
-export MANAGED_IDENTITY_ID="your-managed-identity-id"
-export MANAGED_IDENTITY_CLIENT_ID="your-managed-identity-client-id"
+# System-assigned identity is used; no identity IDs are required
 
 # Generate deployment files
 ./bindplane-aca \
@@ -426,9 +407,7 @@ export MANAGED_IDENTITY_CLIENT_ID="your-managed-identity-client-id"
   -azure-topic "$SERVICE_BUS_TOPIC" \
   -azure-subscription-id "$SUBSCRIPTION_ID" \
   -azure-resource-group "$RESOURCE_GROUP" \
-  -azure-namespace "$SERVICE_BUS_NAMESPACE" \
-  -managed-identity-id "$MANAGED_IDENTITY_ID" \
-  -azure-client-id "$MANAGED_IDENTITY_CLIENT_ID"
+  -azure-namespace "$SERVICE_BUS_NAMESPACE"
 ```
 
 ## Deployment
@@ -496,18 +475,16 @@ az containerapp show \
 3. **Check Service Bus permissions**:
 ```bash
 az role assignment list \
-  --assignee "$MANAGED_IDENTITY_PRINCIPAL_ID" \
+  --assignee "$ENV_PRINCIPAL_ID" \
   --scope "$SERVICE_BUS_ID" \
   --output table
 ```
 
 4. **Common solutions**:
-   - Ensure the Container App has `UserAssigned` managed identity configured with the correct identity ID
-   - Verify the user-assigned managed identity has "Azure Service Bus Data Owner" role on the Service Bus namespace
+   - Ensure the Container Apps Environment has a system-assigned identity (`identity.type` is `SystemAssigned`)
+   - Verify the environment identity has "Azure Service Bus Data Owner" role on the Service Bus namespace
    - Check that the Service Bus namespace and Container Apps are in the same subscription
-   - Ensure the managed identity was created and permissions assigned BEFORE deploying the Container Apps
-   - Verify the managed identity ID parameter matches the actual identity resource ID
-   - **Most importantly**: Ensure the `AZURE_CLIENT_ID` environment variable is set to the managed identity's client ID (Application ID)
+   - If identity was just assigned, wait a minute and redeploy to allow RBAC propagation
 
 ### Managed Identity Not Found
 
@@ -519,19 +496,19 @@ If you're getting "connection refused" errors on `169.254.169.254:80`, this typi
    az containerapp env show --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP" --query "identity"
    ```
 
-2. **User-assigned managed identity not properly attached**:
+2. **Managed identity not attached to environment**:
    ```bash
-   # Verify the managed identity exists and is accessible
-   az identity show --resource-group "$RESOURCE_GROUP" --name "$MANAGED_IDENTITY_NAME"
+   # Check if the Container Apps Environment has identity
+   az containerapp env show --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP" --query "identity"
    
-   # Check if the Container App has the identity attached
-   az containerapp show --name bindplane --resource-group "$RESOURCE_GROUP" --query "identity"
+   # Assign if missing
+   az containerapp env identity assign --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP" --system-assigned
    ```
 
-3. **Wrong managed identity client ID**:
+3. **No token from IMDS yet**:
    ```bash
-   # Get the correct client ID
-   az identity show --resource-group "$RESOURCE_GROUP" --name "$MANAGED_IDENTITY_NAME" --query "clientId" --output tsv
+   # Retry after a short delay; ensure network egress to IMDS (169.254.169.254) is not blocked
+   sleep 60
    ```
 
 ### Environment Variables Not Required
@@ -543,9 +520,7 @@ The Azure SDK uses DefaultAzureCredential which automatically tries multiple aut
 4. Azure CLI credentials
 5. Azure Developer CLI credentials
 
-**For user-assigned managed identity**, the Azure SDK needs the `AZURE_CLIENT_ID` environment variable to know which specific managed identity to use. This is why we set it in the Container App templates.
-
-You do **NOT** need to set AZURE_TENANT_ID or AZURE_CLIENT_SECRET when using managed identity with Azure Container Apps.
+You do **NOT** need to set AZURE_TENANT_ID, AZURE_CLIENT_ID, or AZURE_CLIENT_SECRET when using system-assigned managed identity with Azure Container Apps.
 
 # Community
 

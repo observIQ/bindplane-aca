@@ -32,8 +32,6 @@ type TemplateData struct {
 	AzureSubscriptionID      string
 	AzureResourceGroup       string
 	AzureNamespace           string
-	ManagedIdentityID        string
-	AzureClientID            string
 }
 
 // Config holds command line arguments
@@ -58,8 +56,6 @@ type Config struct {
 	AzureSubscriptionID   string
 	AzureResourceGroup    string
 	AzureNamespace        string
-	ManagedIdentityID     string
-	AzureClientID         string
 }
 
 func main() {
@@ -91,8 +87,6 @@ func main() {
 		AzureSubscriptionID:      config.AzureSubscriptionID,
 		AzureResourceGroup:       config.AzureResourceGroup,
 		AzureNamespace:           config.AzureNamespace,
-		ManagedIdentityID:        config.ManagedIdentityID,
-		AzureClientID:            config.AzureClientID,
 	}
 
 	if err := processTemplates(config, templateData); err != nil {
@@ -128,8 +122,6 @@ func parseFlags() *Config {
 	flag.StringVar(&config.AzureSubscriptionID, "azure-subscription-id", "", "Azure subscription ID (required)")
 	flag.StringVar(&config.AzureResourceGroup, "azure-resource-group", "", "Azure resource group name (required)")
 	flag.StringVar(&config.AzureNamespace, "azure-namespace", "", "Azure Service Bus namespace (required)")
-	flag.StringVar(&config.ManagedIdentityID, "managed-identity-id", "", "User-assigned managed identity ID (required)")
-	flag.StringVar(&config.AzureClientID, "azure-client-id", "", "Azure managed identity client ID (required)")
 
 	flag.Parse()
 
@@ -153,8 +145,6 @@ func validateConfig(config *Config) error {
 		"azure-subscription-id":   config.AzureSubscriptionID,
 		"azure-resource-group":    config.AzureResourceGroup,
 		"azure-namespace":         config.AzureNamespace,
-		"managed-identity-id":     config.ManagedIdentityID,
-		"azure-client-id":         config.AzureClientID,
 	}
 
 	var missing []string
