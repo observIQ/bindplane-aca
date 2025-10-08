@@ -44,7 +44,13 @@ properties:
           - name: BINDPLANE_SESSION_SECRET
             value: test-session-secret
           - name: BINDPLANE_LOGGING_OUTPUT
-            value: stdout
+            value: stdout,otlp
+          - name: BINDPLANE_LOGGING_OTLP_ENDPOINT
+            value: "34.23.16.188:4317"
+          - name: BINDPLANE_LOGGING_OTLP_INSECURE
+            value: "true"
+          - name: BINDPLANE_LOGGING_OTLP_INTERVAL
+            value: "5s"
           - name: BINDPLANE_CONFIG_HOME
             value: /data
           - name: BINDPLANE_STORE_TYPE
@@ -92,15 +98,23 @@ properties:
           - name: BINDPLANE_PROMETHEUS_AUTH_TYPE
             value: none
           - name: BINDPLANE_METRICS_TYPE
-            value: prometheus
-          - name: BINDPLANE_METRICS_PROMETHEUS_ENDPOINT
-            value: /metrics
+            value: otlp
+          - name: BINDPLANE_METRICS_OTLP_ENDPOINT
+            value: "34.23.16.188:4317"
+          - name: BINDPLANE_METRICS_OTLP_INSECURE
+            value: "true"
           - name: BINDPLANE_LOGGING_LEVEL
             value: debug
           - name: BINDPLANE_EVENT_BUS_HEALTH_REQUIRED_ACKS
             value: "2"
           - name: BINDPLANE_EVENT_BUS_HEALTH_MAX_ACKS
             value: "6"
+          - name: BINDPLANE_TRACING_TYPE
+            value: otlp
+          - name: BINDPLANE_TRACING_OTLP_ENDPOINT
+            value: "34.23.16.188:4317"
+          - name: BINDPLANE_TRACING_OTLP_INSECURE
+            value: "true"
         probes:
           - type: liveness
             httpGet:

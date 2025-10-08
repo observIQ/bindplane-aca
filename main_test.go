@@ -33,6 +33,8 @@ func TestTemplateProcessing(t *testing.T) {
 		AzureSubscriptionID:      "test-subscription-id",
 		AzureResourceGroup:       "test-rg",
 		AzureNamespace:           "test-namespace",
+		ManagedIdentityID:        "test-managed-identity-id",
+		AzureClientID:            "test-client-id",
 	}
 
 	templateFiles := []string{
@@ -111,6 +113,8 @@ func TestValidateConfig(t *testing.T) {
 				AzureSubscriptionID:   "test-subscription-id",
 				AzureResourceGroup:    "test-rg",
 				AzureNamespace:        "test-namespace",
+				ManagedIdentityID:     "test-managed-identity-id",
+				AzureClientID:         "test-client-id",
 			},
 			wantError: false,
 		},
