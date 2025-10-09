@@ -184,6 +184,7 @@ func processTemplates(config *Config, data *TemplateData) error {
 		"jobs.yaml",
 		"prometheus.yaml",
 		"transform-agent.yaml",
+		"otelcol.yaml",
 	}
 
 	for _, filename := range templateFiles {
@@ -257,6 +258,9 @@ func generateDeploymentCommands(config *Config) {
 		"",
 		"echo \"4. Deploying main Bindplane application...\"",
 		fmt.Sprintf("az containerapp create --name bindplane --resource-group %s --yaml %s/bindplane.yaml", config.ResourceGroup, config.OutputDir),
+		"",
+		"echo \"5. Deploying OTel Collector...\"",
+		fmt.Sprintf("az containerapp create --name otelcol --resource-group %s --yaml %s/otelcol.yaml", config.ResourceGroup, config.OutputDir),
 		"",
 		"echo \"Deployment complete!\"",
 		"",

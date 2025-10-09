@@ -1,0 +1,224 @@
+# Deployment steps:
+# 1. Search and replace "your-api-key" with the Datadog API key in the datadog exporter
+# 2. Search and replace "us5.datadoghq.com" with the Datadog site to send data to
+# 3. Deploy the collector to Azure Container Apps
+# 4. Configured Bindplane to forward telemetry to this collector (See below)
+#
+# Configure Bindplane to forward telemetry to the collector's
+# gRPC port 4317. OTLP HTTP (port 4318) is not supported by Bindplane.
+# - name: BINDPLANE_METRICS_TYPE
+#   value: otlp
+# - name: BINDPLANE_METRICS_OTLP_ENDPOINT
+#   value: "otelcol:4317"
+# - name: BINDPLANE_METRICS_OTLP_INSECURE
+#   value: "true"
+#
+# Troubleshooting: You should view the collector container's logs and look for messages similar to this:
+# 
+# '2025-10-09T15:28:37.8713618Z stdout F {"level":"info","ts":"2025-10-09T15:28:37.871Z","msg":"Metrics","resource":
+# {"service.instance.id":"af1aa739-9894-4384-9737-75a0d981d9f3","service.name":"/collector/observiq-otel-collector",
+# "service.version":"v1.84.0"},"otelcol.component.id":"debug","otelcol.component.kind":"exporter","otelcol.signal":
+# "metrics","resource metrics":1,"metrics":35,"data points":64}'
+#
+# If you see consistent logs from the "debug" exporter display metric and data point counts, this means the collector
+# is receiving telemetry from Bindplane.
+
+name: otelcol
+type: Microsoft.App/containerApps
+location: eastus
+properties:
+  managedEnvironmentId: test-env-12345
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 4318
+      allowInsecure: true
+      additionalPortMappings:
+        - external: false
+          targetPort: 4317
+          exposedPort: 4317
+    secrets:
+      - name: otel-config
+        value: |
+          # This configuration implements the OTLP receiver and Datadog exporter
+          # for sending Logs, Metrics, and Traces to Datadog.
+          #
+          # Bindplane supports sending metrics and traces to the collector over
+          # gRPC (Port 4317).
+          #
+          # Log support may become available in the future. It is included here for
+          # forward compatibility.
+          #
+          # Please review the Datadog exporter documentation for more information:
+          # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/datadogexporter
+          #
+
+          receivers:
+            # OTLP receiver accepts gRPC connections on port 4317. gRPC
+            # is the protocol used by Bindplane when exporting telemetry
+            # to the collector.
+            # HTTP receiver accepts HTTP connections on port 4318. HTTP
+            # is included because Azure ingress requires an HTTP port. The
+            # gRPC port is exposed by ingress "additionalPortMappings".
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                  keepalive:
+                    server_parameters:
+                      max_connection_age: 1m0s
+                      max_connection_age_grace: 5m0s
+                      max_connection_idle: 1m0s
+                      time: 2h
+                      timeout: 20s
+                  max_recv_msg_size_mib: 20
+                http:
+                  endpoint: 0.0.0.0:4318
+
+            # Prometheus receiver scrapes the collector's own
+            # telemetry port. The collector's metrics are useful
+            # for debugging or detecting issues.
+            prometheus:
+              config:
+                scrape_configs:
+                  - job_name: collector
+                    metrics_path: /metrics
+                    scrape_interval: 1m0s
+                    static_configs:
+                      - targets:
+                          - localhost:8888
+
+          processors:
+            # The batch processor groups telemetry into batches, making
+            # the exporter more efficient. Batching should be used for
+            # logs and traces. Metrics are received in batches already.
+            batch:
+              send_batch_size: 200
+              send_batch_max_size: 1000
+              timeout: 1s
+
+          exporters:
+            # The Datadog exporter requires two parameters:
+            # - api.key: The Datadog API key
+            # - site: The Datadog site to send data to
+            #
+            # More information on sites can be found here (see "Site Parameter"):
+            # https://docs.datadoghq.com/getting_started/site/
+            datadog:
+              api:
+                key: your-api-key
+                site: us5.datadoghq.com
+              metrics:
+                resource_attributes_as_tags: true
+              retry_on_failure:
+                enabled: true
+                initial_interval: 1s
+                max_interval: 10s
+                max_elapsed_time: 60s
+              sending_queue:
+                enabled: true
+                num_consumers: 4
+                queue_size: 200
+
+            # Debug is useful for logging collector activity. Under high
+            # load, it will sample messages. It is a useful way to know
+            # if the collector is receiving telemetry.
+            debug:
+
+          service:
+            pipelines:
+              logs:
+                receivers:
+                  - otlp
+                processors:
+                  - batch
+                exporters:
+                  - datadog
+                  - debug
+
+              # Primary metrics pipeline receives metrics from Bindplane
+              # and forwards them to Datadog. Utilizes the "debug" exporter
+              # for easy troubleshooting.
+              metrics:
+                receivers:
+                  - otlp
+                processors: []
+                exporters:
+                  - datadog
+                  - debug
+
+              # Scrapes the collector's metric port. Omits the "debug" exporter
+              # to avoid confusion.
+              metrics/collector:
+                receivers:
+                  - prometheus
+                processors: []
+                exporters:
+                  - datadog
+
+              traces:
+                receivers:
+                  - otlp
+                processors:
+                  - batch
+                exporters:
+                  - datadog
+                  - debug
+
+            telemetry:
+              metrics:
+                readers:
+                  - pull:
+                      exporter:
+                        prometheus:
+                          host: localhost
+                          port: 8888
+                level: normal
+
+      - name: logging-config
+        value: |
+          output: stdout
+          level: info
+
+  template:
+    volumes:
+      - name: otel-config-vol
+        storageType: Secret
+        secrets:
+          - secretRef: otel-config
+            path: config.yaml
+          - secretRef: logging-config
+            path: logging.yaml
+    containers:
+      - name: otelcol
+        image: ghcr.io/observiq/observiq-otel-collector:1.84.0
+        args:
+          - --config=/etc/otel/config.yaml
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+        volumeMounts:
+          - volumeName: otel-config-vol
+            mountPath: /etc/otel
+            readOnly: true
+        probes:
+          - type: liveness
+            httpGet:
+              path: /metrics
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: readiness
+            httpGet:
+              path: /metrics
+              port: 8888
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+    scale:
+      minReplicas: 2
+      maxReplicas: 5
