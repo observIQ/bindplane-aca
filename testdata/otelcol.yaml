@@ -27,7 +27,7 @@ name: otelcol
 type: Microsoft.App/containerApps
 location: eastus
 properties:
-  managedEnvironmentId: {{.ACAEnvironmentID}}
+  managedEnvironmentId: test-env-12345
   configuration:
     activeRevisionsMode: Single
     ingress:
