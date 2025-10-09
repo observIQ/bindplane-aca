@@ -1,0 +1,47 @@
+name: otelcol
+type: Microsoft.App/containerApps
+location: eastus
+properties:
+  managedEnvironmentId: {{.ACAEnvironmentID}}
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 4318
+      allowInsecure: true
+      additionalPortMappings:
+        - external: false
+          targetPort: 4317
+          exposedPort: 4317
+  template:
+    containers:
+      - name: otelcol
+        image: ghcr.io/observiq/observiq-otel-collector:1.84.0
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+        env:
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://0.0.0.0:4318"
+          - name: OTEL_EXPORTER_OTLP_GRPC_ENDPOINT
+            value: "0.0.0.0:4317"
+        probes:
+          - type: liveness
+            httpGet:
+              path: /metrics
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: readiness
+            httpGet:
+              path: /metrics
+              port: 8888
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+    scale:
+      minReplicas: 2
+      maxReplicas: 5
