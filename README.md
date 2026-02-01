@@ -81,7 +81,8 @@ az servicebus namespace create \
   --resource-group "$RESOURCE_GROUP" \
   --name "$SERVICE_BUS_NAMESPACE" \
   --location "$LOCATION" \
-  --sku Standard
+  --sku Premium \
+  --capacity 1
 ```
 
 ### 2.2 Create Service Bus topic
@@ -90,11 +91,17 @@ az servicebus namespace create \
 # Set topic name
 TOPIC_NAME="bindplane-events"
 
-# Create Service Bus topic
+# Create Service Bus topic with:
+# - 5 minute default message TTL (ISO 8601 duration: PT5M)
+# - 10 GB topic size (MB: 10 * 1024 = 10240)
+# - 10 MB max message size (KB: 10 * 1024 = 10240) [Premium-only]
 az servicebus topic create \
   --resource-group "$RESOURCE_GROUP" \
   --namespace-name "$SERVICE_BUS_NAMESPACE" \
-  --name "$TOPIC_NAME"
+  --name "$TOPIC_NAME" \
+  --default-message-time-to-live "PT5M" \
+  --max-size 10240 \
+  --max-message-size 10240
 ```
 
 ### 2.3 Get connection string and subscription ID
