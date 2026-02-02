@@ -135,6 +135,18 @@ echo "Subscription ID: $SUBSCRIPTION_ID"
 Now create the Container Apps Environment and assign a system-assigned managed identity:
 
 ```bash
+# Premium ingress sizing notes (for ~150k concurrent WebSockets):
+# - Premium ingress runs the environment's ingress proxy on a *dedicated workload profile* that you control.
+# - Premium ingress requires a workload profile with >= 2 min nodes.
+# - For 150,000 concurrent WebSockets with rapid connect storms, start with D8 nodes and keep enough baseline
+#   nodes online to absorb the initial connection burst without waiting for node scale-out.
+#
+# Adjust these after a real load test; this is a conservative starting point.
+INGRESS_WORKLOAD_PROFILE_NAME="ingress-d4"
+INGRESS_WORKLOAD_PROFILE_TYPE="D4"
+INGRESS_MIN_NODES=4
+INGRESS_MAX_NODES=12
+
 # Create Container Apps environment with VNet integration and managed identity
 az containerapp env create \
   --name "$ENV_NAME" \
@@ -143,6 +155,27 @@ az containerapp env create \
   --infrastructure-subnet-resource-id "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$SUBNET_NAME" \
   --internal-only false \
   --enable-workload-profiles
+
+# Add a dedicated workload profile for Premium Ingress
+az containerapp env workload-profile add \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --workload-profile-name "$INGRESS_WORKLOAD_PROFILE_NAME" \
+  --workload-profile-type "$INGRESS_WORKLOAD_PROFILE_TYPE" \
+  --min-nodes "$INGRESS_MIN_NODES" \
+  --max-nodes "$INGRESS_MAX_NODES"
+
+# Enable Premium Ingress on the environment using the workload profile above.
+# These values help with long-lived connections and graceful rollout/scale-in.
+az containerapp env premium-ingress add \
+  --name "$ENV_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --workload-profile-name "$INGRESS_WORKLOAD_PROFILE_NAME" \
+  --termination-grace-period 1800 \
+  --request-idle-timeout 30 \
+  --header-count-limit 200 \
+  --min-replicas "4" \
+  --max-replicas "12"
 
 # Assign a system-assigned managed identity to the environment
 az containerapp env identity assign \
