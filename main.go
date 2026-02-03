@@ -60,6 +60,7 @@ type Config struct {
 	AzureNamespace        string
 	ManagedIdentityID     string
 	AzureClientID         string
+	DeployPrometheus      bool
 }
 
 func main() {
@@ -130,6 +131,7 @@ func parseFlags() *Config {
 	flag.StringVar(&config.AzureNamespace, "azure-namespace", "", "Azure Service Bus namespace (required)")
 	flag.StringVar(&config.ManagedIdentityID, "managed-identity-id", "", "User-assigned managed identity ID (required for UAI path)")
 	flag.StringVar(&config.AzureClientID, "azure-client-id", "", "Azure managed identity client ID (required for UAI path)")
+	flag.BoolVar(&config.DeployPrometheus, "deploy-prometheus", false, "Deploy Prometheus (default false)")
 
 	flag.Parse()
 
@@ -178,13 +180,17 @@ func processTemplates(config *Config, data *TemplateData) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	// Template files to process
+	// Template files to process (prometheus is optional)
 	templateFiles := []string{
 		"bindplane.yaml",
 		"jobs.yaml",
-		"prometheus.yaml",
 		"transform-agent.yaml",
 		"otelcol.yaml",
+	}
+	if config.DeployPrometheus {
+		// Insert prometheus right after jobs so it's available before bindplane starts.
+		const insertIdx = 2
+		templateFiles = append(templateFiles[:insertIdx], append([]string{"prometheus.yaml"}, templateFiles[insertIdx:]...)...)
 	}
 
 	for _, filename := range templateFiles {
@@ -232,35 +238,44 @@ func processTemplate(config *Config, data *TemplateData, filename string) error 
 func generateDeploymentCommands(config *Config) {
 	commandsFile := filepath.Join(config.OutputDir, "deploy.sh")
 
+	outputDirVar := fmt.Sprintf("OUTPUT_DIR=\"%s\"", config.OutputDir)
 	commands := []string{
 		"#!/bin/bash",
 		"# Generated deployment commands for Bindplane Azure Container Apps",
 		"",
 		"set -e",
 		"",
+		outputDirVar,
+		"",
 		"echo \"Deploying Bindplane to Azure Container Apps...\"",
 		"",
 		"# Ensure environment storage exists for Azure Files volumes",
 		fmt.Sprintf("ENV_NAME=$(basename %s)", config.ACAEnvironmentID),
 		fmt.Sprintf("echo \"Using Container Apps environment: $ENV_NAME in resource group %s\"", config.ResourceGroup),
-		fmt.Sprintf("az containerapp env storage set --name \"$ENV_NAME\" --resource-group %s --storage-name prometheus-pv --azure-file-account-name \"%s\" --azure-file-account-key \"%s\" --azure-file-share-name prometheus-data --access-mode ReadWrite || true", config.ResourceGroup, config.StorageAccountName, config.StorageAccountKey),
+		"",
+		"# Deploy Prometheus only if prometheus.yaml is present",
+		"if [ -f \"$OUTPUT_DIR/prometheus.yaml\" ]; then",
+		fmt.Sprintf("  az containerapp env storage set --name \"$ENV_NAME\" --resource-group %s --storage-name prometheus-pv --azure-file-account-name \"%s\" --azure-file-account-key \"%s\" --azure-file-share-name prometheus-data --access-mode ReadWrite || true", config.ResourceGroup, config.StorageAccountName, config.StorageAccountKey),
+		"fi",
 		"",
 		"# Deploy in order to ensure proper dependencies",
 		"",
-		"echo \"1. Deploying Transform Agent...\"",
-		fmt.Sprintf("az containerapp create --name bindplane-transform-agent --resource-group %s --yaml %s/transform-agent.yaml", config.ResourceGroup, config.OutputDir),
+		"echo \"Deploying Transform Agent...\"",
+		fmt.Sprintf("az containerapp create --name bindplane-transform-agent --resource-group %s --yaml \"$OUTPUT_DIR/transform-agent.yaml\"", config.ResourceGroup),
 		"",
-		"echo \"2. Deploying Prometheus...\"",
-		fmt.Sprintf("az containerapp create --name bindplane-prometheus --resource-group %s --yaml %s/prometheus.yaml", config.ResourceGroup, config.OutputDir),
+		"if [ -f \"$OUTPUT_DIR/prometheus.yaml\" ]; then",
+		"  echo \"Deploying Prometheus...\"",
+		fmt.Sprintf("  az containerapp create --name bindplane-prometheus --resource-group %s --yaml \"$OUTPUT_DIR/prometheus.yaml\"", config.ResourceGroup),
+		"fi",
 		"",
-		"echo \"3. Deploying Jobs component...\"",
-		fmt.Sprintf("az containerapp create --name bindplane-jobs --resource-group %s --yaml %s/jobs.yaml", config.ResourceGroup, config.OutputDir),
+		"echo \"Deploying Jobs component...\"",
+		fmt.Sprintf("az containerapp create --name bindplane-jobs --resource-group %s --yaml \"$OUTPUT_DIR/jobs.yaml\"", config.ResourceGroup),
 		"",
-		"echo \"4. Deploying main Bindplane application...\"",
-		fmt.Sprintf("az containerapp create --name bindplane --resource-group %s --yaml %s/bindplane.yaml", config.ResourceGroup, config.OutputDir),
+		"echo \"Deploying main Bindplane application...\"",
+		fmt.Sprintf("az containerapp create --name bindplane --resource-group %s --yaml \"$OUTPUT_DIR/bindplane.yaml\"", config.ResourceGroup),
 		"",
-		"echo \"5. Deploying OTel Collector...\"",
-		fmt.Sprintf("az containerapp create --name otelcol --resource-group %s --yaml %s/otelcol.yaml", config.ResourceGroup, config.OutputDir),
+		"echo \"Deploying OTel Collector...\"",
+		fmt.Sprintf("az containerapp create --name otelcol --resource-group %s --yaml \"$OUTPUT_DIR/otelcol.yaml\"", config.ResourceGroup),
 		"",
 		"echo \"Deployment complete!\"",
 		"",

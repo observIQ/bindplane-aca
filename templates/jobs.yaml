@@ -16,7 +16,8 @@ properties:
   template:
     containers:
       - name: server
-        image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
+        #image: ghcr.io/observiq/bindplane-ee:{{.BindplaneTag}}
+        image: observiq/bindplane-ee-amd64:1.97.0-SNAPSHOT-e0838d114
         resources:
           cpu: 2
           memory: 4Gi
@@ -46,7 +47,7 @@ properties:
           - name: BINDPLANE_LOGGING_OUTPUT
             value: stdout,otlp
           - name: BINDPLANE_LOGGING_OTLP_ENDPOINT
-            value: "34.23.16.188:4317"
+            value: "otelcol:4317"
           - name: BINDPLANE_LOGGING_OTLP_INSECURE
             value: "true"
           - name: BINDPLANE_LOGGING_OTLP_INTERVAL
@@ -83,6 +84,10 @@ properties:
             value: {{.AzureNamespace}}
           - name: AZURE_CLIENT_ID
             value: {{.AzureClientID}}
+          - name: BINDPLANE_AZURE_MAX_BATCH_SIZE
+            value: 1000
+          - name: BINDPLANE_AZURE_MAX_PAYLOAD_SIZE
+            value: 10000000
           - name: BINDPLANE_PORT
             value: "3001"
           - name: BINDPLANE_PROMETHEUS_ENABLE
@@ -90,9 +95,9 @@ properties:
           - name: BINDPLANE_PROMETHEUS_ENABLE_REMOTE
             value: "true"
           - name: BINDPLANE_PROMETHEUS_HOST
-            value: bindplane-prometheus
+            value: 10.0.0.5
           - name: BINDPLANE_PROMETHEUS_PORT
-            value: "80"
+            value: "9090"
           - name: BINDPLANE_PROMETHEUS_REMOTE_WRITE_ENDPOINT
             value: /api/v1/write
           - name: BINDPLANE_PROMETHEUS_AUTH_TYPE
@@ -100,7 +105,7 @@ properties:
           - name: BINDPLANE_METRICS_TYPE
             value: otlp
           - name: BINDPLANE_METRICS_OTLP_ENDPOINT
-            value: "34.23.16.188:4317"
+            value: "otelcol:4317"
           - name: BINDPLANE_METRICS_OTLP_INSECURE
             value: "true"
           - name: BINDPLANE_LOGGING_LEVEL
@@ -112,9 +117,11 @@ properties:
           - name: BINDPLANE_TRACING_TYPE
             value: otlp
           - name: BINDPLANE_TRACING_OTLP_ENDPOINT
-            value: "34.23.16.188:4317"
+            value: "otelcol:4317"
           - name: BINDPLANE_TRACING_OTLP_INSECURE
             value: "true"
+          - name: BINDPLANE_TRACING_SAMPLING_RATE
+            value: "1.0"
         probes:
           - type: liveness
             httpGet:

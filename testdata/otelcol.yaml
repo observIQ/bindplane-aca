@@ -98,6 +98,51 @@ properties:
               send_batch_max_size: 1000
               timeout: 1s
 
+            transform/gcp__drop-raw-copy:
+                log_statements:
+                    - context: log
+                      statements:
+                        - delete_key(attributes, "log.record.original")
+            transform/gcp__location:
+                error_mode: ignore
+                log_statements:
+                    - context: resource
+                      statements:
+                        - set(attributes["cloud.region"], "us-east1") where (attributes["cloud.region"] == nil) and (attributes["cloud.availability_zone"] == nil)
+                metric_statements:
+                    - context: resource
+                      statements:
+                        - set(attributes["cloud.region"], "us-east1") where (attributes["cloud.region"] == nil) and (attributes["cloud.availability_zone"] == nil)
+                trace_statements:
+                    - context: resource
+                      statements:
+                        - set(attributes["cloud.region"], "us-east1") where (attributes["cloud.region"] == nil) and (attributes["cloud.availability_zone"] == nil)
+            transform/source0_01KG36NZX4RMQ3YJRVW301SPS0__processor0__logs:
+                error_mode: ignore
+                log_statements:
+                    - context: log
+                      statements:
+                        - |
+                          merge_maps(
+                            body,
+                            ParseJSON(
+                              body
+                            ),
+                            "upsert"
+                          ) where IsMap(body) and true
+                        - |
+                          set(
+                            body,
+                            ParseJSON(
+                              body
+                            )
+                          ) where not IsMap(body) and true
+
+            filter/sev:
+                logs:
+                    log_record:
+                        - true and severity_number != 0 and severity_number < 13
+
           exporters:
             # The Datadog exporter requires two parameters:
             # - api.key: The Datadog API key
@@ -105,37 +150,71 @@ properties:
             #
             # More information on sites can be found here (see "Site Parameter"):
             # https://docs.datadoghq.com/getting_started/site/
-            datadog:
-              api:
-                key: your-api-key
-                site: us5.datadoghq.com
-              metrics:
-                resource_attributes_as_tags: true
-              retry_on_failure:
-                enabled: true
-                initial_interval: 1s
-                max_interval: 10s
-                max_elapsed_time: 60s
-              sending_queue:
-                enabled: true
-                num_consumers: 4
-                queue_size: 200
+            # datadog:
+            #   api:
+            #     key: your-api-key
+            #     site: us5.datadoghq.com
+            #   metrics:
+            #     resource_attributes_as_tags: true
+            #   retry_on_failure:
+            #     enabled: true
+            #     initial_interval: 1s
+            #     max_interval: 10s
+            #     max_elapsed_time: 60s
+            #   sending_queue:
+            #     enabled: true
+            #     num_consumers: 4
+            #     queue_size: 200
+
+            azuremonitor:
+              connection_string: InstrumentationKey=c57f94d3-0493-4f54-9720-09a9b82517bc;IngestionEndpoint=https://centralus-2.in.applicationinsights.azure.com/;LiveEndpoint=https://centralus.livediagnostics.monitor.azure.com/;ApplicationId=1773b2cc-6a82-4f18-b852-a42294cd0c65
+
+            googlecloud:
+                credentials: '{   "type": "service_account",   "project_id": "bpcli-dev",   "private_key_id": "bae5a5d9d4333a49993c8ba8b30acbd0b5ab729f",   "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDYqhUzP6x301t7\nky8BsOg9Xc2aRsssxpNhRIcaddzw7Kk4E2QxZ0Vrjp1gF8tl9hkienvIbB4qjoki\nJSsboWDquvWKMbwT+jXCcUSGgeBsUnU4mewljClSGB32S5pc7UfKCz8aOHp2WUih\nxgSGXgnfNJUJoyTqkQ0TWYO/bFCqPdU7fwFiOjpnqYoNLbQPa4XVX48Q6ZxsQUH9\nZ2pyKmTV97CVRPBlNAtQzXVstL3N+AHIdl/EgpcbzWvyTlyffXeeDSCbPF+JRqE5\nzbjhi0qIjSnL29iDyaGZK+MgnwdF6z88/1uUAMmObzc6yRb2wwKNPKdhEqD1o4KD\nXIGk+ktDAgMBAAECggEANbsEM+fkAPlI1B39h8lT5rgG/23z/+Ak93ezm4PELXk7\nQ91HORs3s4M0EvsDpX8A37SJUvxBBOPBLVcTWDBOpReFQeawkjG4OEa3rDW0LpjK\nWiWN0wftzV6Ou6AnIUl0xq3AUePUttnQcdH2GE5k21YiabfsNUGQgQ5vZj7ZyEXF\nD03kjWg92DWp04ppK0T2iV9oh6r9Et0bR+Nqns3Z6O5xvVy867A33gIEw+bxbbty\noJF6qR0b3AuR0pYoYuWlGtcd7qt8TGLEx7RebBm7h9G0rWKdL1WK23s64ABBNZjC\nkq6pt2B9oSkCbg8RbRag0ux170TZN1OQ3NjzldogJQKBgQDYv2jR8goSY/aB7awe\n96E1D1pV8JZCcI9hnPrGVnxQN5rnzKHdwGa+y1etNSdCd6hDG86M+D/HppQbhV+T\nByrAu4EcU/liMVEVjv1sCEK/BCpT6InRjyr48LkU242d1s1NG01vse4YB16W9UJf\nkLNV8cd265hzYCPcy4ftOWpq/wKBgQD/5s+pGvnlhUU6XeziupZIo/d5Q84tYqay\n1N0ZI0HDM/K4K0XT7Dl+m3d0j/xZ0LvHNiHepj2c4rKIBIhbPVuvTwoMJEVseM7F\nVWg4fZN+/nKwehakqNwWGzxO3l/j1zf26cAHRjGU98ep/zxMjedSCyuVysRJ6wQ7\nYbBUNGezvQKBgEys6dfbV9TJqBquiYUq9MxgcgSU55L5Xr+ZWN1xGukFwrbdnSVl\nOvOj25BajVjmG5Ah9h/IckeeliZmODk6/9TOgA4VZtNlvtlxjBT7lyEbyB2G1bpc\ne0c1YUQPpzl/E4GDdxFcUG4PrVaZzLEh708oCPf4wCWQjR8+oQc6mHrhAoGBANCH\nqL8X4X3cjR5T/b6A6AhHvVmPHIs1cbwW5Bkg9uz3/xl/AccBH5UBYWWWE8Co7OwY\nO59w/pJC1dMrRmZ7aKRCF2Dvibcr9ustfuFRy4jYFmOjCaKii75j8VAfvCoxbkSC\nFN6Yn7zR8V2hROTpWhAsVBcbhbrqjadKIuNrVPpNAoGBAJtq+yrhIAxOcVByP5UC\nKrVM740VbJYwXk7Ih5chQlxPsddeCbj/MOYJ+WhV4qDnwHZJ/NZ6jHQmAga3K0aG\n9d7eh1NRz8hG4+cwbjmhK+Fv8mbabw7/fxwzUGV4IYs3NGi16pLiAG+f04HQzVW0\nPzSiJa/jEOAB01PkaQqz9rgF\n-----END PRIVATE KEY-----\n",   "client_email": "otel-778@bpcli-dev.iam.gserviceaccount.com",   "client_id": "116660262332834817658",   "auth_uri": "https://accounts.google.com/o/oauth2/auth",   "token_uri": "https://oauth2.googleapis.com/token",   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/otel-778%40bpcli-dev.iam.gserviceaccount.com",   "universe_domain": "googleapis.com" }'
+                log:
+                    compression: gzip
+                    resource_filters:
+                        - regex: .*
+                metric:
+                    compression: gzip
+                project: bpcli-dev
+                sending_queue:
+                    enabled: false
+                    # num_consumers: 4
+                    # queue_size: 100
+                    # storage: file_storage
+                timeout: 5s
+
 
             # Debug is useful for logging collector activity. Under high
             # load, it will sample messages. It is a useful way to know
             # if the collector is receiving telemetry.
             debug:
 
+          # extensions:
+          #     file_storage:
+          #         compaction:
+          #             directory: ${OIQ_OTEL_COLLECTOR_HOME}/storage
+          #             on_rebound: true
+          #         directory: ${OIQ_OTEL_COLLECTOR_HOME}/storage
+          #         create_directory: true
+
           service:
+            # extensions:
+            #     - file_storage
             pipelines:
               logs:
                 receivers:
                   - otlp
                 processors:
+                  #- filter/sev
+                  - transform/gcp__drop-raw-copy
+                  - transform/gcp__location
+                  - transform/source0_01KG36NZX4RMQ3YJRVW301SPS0__processor0__logs
                   - batch
                 exporters:
-                  - datadog
                   - debug
+                  - googlecloud
 
               # Primary metrics pipeline receives metrics from Bindplane
               # and forwards them to Datadog. Utilizes the "debug" exporter
@@ -143,19 +222,22 @@ properties:
               metrics:
                 receivers:
                   - otlp
-                processors: []
+                processors:
+                  - transform/gcp__location
                 exporters:
-                  - datadog
                   - debug
+                  - googlecloud
 
               # Scrapes the collector's metric port. Omits the "debug" exporter
               # to avoid confusion.
               metrics/collector:
                 receivers:
                   - prometheus
-                processors: []
+                processors:
+                  - transform/gcp__location
+                  - batch
                 exporters:
-                  - datadog
+                  - googlecloud
 
               traces:
                 receivers:
@@ -163,8 +245,8 @@ properties:
                 processors:
                   - batch
                 exporters:
-                  - datadog
                   - debug
+                  - googlecloud
 
             telemetry:
               metrics:
@@ -192,7 +274,7 @@ properties:
             path: logging.yaml
     containers:
       - name: otelcol
-        image: ghcr.io/observiq/observiq-otel-collector:1.84.0
+        image: ghcr.io/observiq/observiq-otel-collector:1.91.0
         args:
           - --config=/etc/otel/config.yaml
         resources:

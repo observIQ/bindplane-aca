@@ -15,8 +15,8 @@ properties:
       - name: prometheus
         image: ghcr.io/observiq/bindplane-prometheus:{{.BindplaneTag}}
         resources:
-          cpu: 2.0
-          memory: 4Gi
+          cpu: 4.0
+          memory: 8Gi
         volumeMounts:
           - volumeName: prometheus-data
             mountPath: /prometheus
